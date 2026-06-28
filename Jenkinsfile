@@ -37,12 +37,6 @@ NOTE: On PR builds this parameter is ignored — Smoke always runs.'''
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Resolve test group') {
             steps {
                 script {
