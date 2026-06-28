@@ -1,0 +1,13 @@
+# Maven build output
+target/
+
+# Allure CLI (downloaded by allure-maven plugin at runtime)
+.allure/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+

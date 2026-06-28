@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Restful-Booker Suite" parallel="true" thread-count="10">
+
+    <listeners>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+    </listeners>
+
+
+    <test name="Booking Lifecycle Test">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.BookingLifecycleTest"/>
+        </classes>
+    </test>
+
+    <test name="Authentication Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.AuthenticationTest"/>
+        </classes>
+    </test>
+
+    <test name="Get Booking By ID Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.GetBookingByIdTest"/>
+        </classes>
+    </test>
+
+    <test name="Create Bookings Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.CreateBookingsTest"/>
+        </classes>
+    </test>
+
+    <test name="Update Bookings Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.UpdateBookingsTest"/>
+        </classes>
+    </test>
+
+    <test name="Delete Bookings Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.DeleteBookingsTest"/>
+        </classes>
+    </test>
+
+    <test name="Idempotency Tests">
+        <classes>
+            <class name="com.nextbillion.service.booker.tests.IdempotencyTest"/>
+        </classes>
+    </test>
+
+</suite>
