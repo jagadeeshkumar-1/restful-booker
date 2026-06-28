@@ -20,6 +20,15 @@ NOTE: On PR builds this parameter is ignored — Smoke always runs.'''
         )
     }
 
+    /*
+     * Tells Jenkins to put the configured Maven installation on PATH for every
+     * sh step. The name 'Maven' must match exactly what is configured under
+     * Manage Jenkins → Tools → Maven installations.
+     */
+    tools {
+        maven 'Maven'
+    }
+
     options {
         timeout(time: 15, unit: 'MINUTES')   // abort runaway builds
         disableConcurrentBuilds()            // one build per branch at a time
