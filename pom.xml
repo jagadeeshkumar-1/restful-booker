@@ -29,14 +29,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Rest Assured JSON schema validation -->
-        <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>json-schema-validator</artifactId>
-            <version>${rest-assured.version}</version>
-            <scope>test</scope>
-        </dependency>
-
         <!-- TestNG -->
         <dependency>
             <groupId>org.testng</groupId>
@@ -50,6 +42,7 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- Lombok — eliminates boilerplate getters/setters/constructors in model classes -->
@@ -91,13 +84,6 @@
                     <systemPropertyVariables>
                         <booker.base.uri>${booker.base.uri}</booker.base.uri>
                     </systemPropertyVariables>
-                    <!-- write allure-results/ alongside surefire-reports/ -->
-                    <properties>
-                        <property>
-                            <name>listener</name>
-                            <value>io.qameta.allure.testng.AllureTestNg</value>
-                        </property>
-                    </properties>
                 </configuration>
             </plugin>
 

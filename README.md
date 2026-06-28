@@ -33,6 +33,8 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 | Jackson | 2.17.1 | JSON serialization / deserialization |
 | Lombok | 1.18.32 | Eliminates boilerplate getters/setters in model classes |
 | Hamcrest | 2.2 | Assertion matchers |
+| Allure TestNG | 2.27.0 | Test result collection for HTML reports |
+| Allure Maven | 2.12.0 | Generates interactive HTML report (`mvn allure:serve`) |
 | Maven Surefire | 3.2.5 | Test execution plugin |
 
 ---
@@ -438,111 +440,353 @@ Measured over 5 full runs (95 tests at time of measurement; 3 additional GET /bo
 
 ## CI / Jenkins Setup
 
-The `Jenkinsfile` at the repo root defines the pipeline. It uses a **Multibranch Pipeline** job, which:
-- Auto-discovers every branch and PR in the repository.
-- Forces **Smoke** tests on every pull request (`env.CHANGE_ID` is set by the GitHub Branch Source plugin when a PR triggers the build).
-- Allows choosing any group (`Smoke`, `Regression`, `ExistingDefect`, `All`) for manual / branch builds via a build parameter.
-- Publishes TestNG/Surefire XML results — Jenkins marks the build **UNSTABLE** if any test fails, which is used to block PR merges in GitHub.
+This project uses a **Jenkins Multibranch Pipeline** defined in `Jenkinsfile` at the repo root.
+
+### What it does automatically
+- Every **pull request** → runs **Smoke** tests (forced, ~20 tests, ~30s)
+- Every **branch push** → runs whichever `TEST_GROUP` you select (default: `Smoke`)
+- If any test fails → Jenkins marks build **UNSTABLE** → GitHub blocks the PR merge
+- After every run → generates an **Allure HTML report** visible inside Jenkins
 
 ---
 
-### Step 1 — Required Jenkins plugins
+### Jenkinsfile — stage by stage walkthrough
 
-Install these from **Manage Jenkins → Plugins → Available**:
+```groovy
+pipeline {
+    agent any          // run on any available Jenkins node
 
-| Plugin | Purpose |
-|--------|---------|
-| **GitHub Branch Source** | Discovers PRs, reports build status back to GitHub automatically |
-| **Pipeline** | Enables `Jenkinsfile` declarative pipeline |
-| **JUnit** | Parses Surefire XML and publishes test results |
-| **Maven Integration** | Maven build support (or ensure `mvn` is on `PATH`) |
+    parameters {
+        choice(name: 'TEST_GROUP',
+               choices: ['Smoke','Regression','ExistingDefect','All'])
+        // Only used for manual builds. PRs always force Smoke (see below).
+    }
+
+    tools {
+        maven 'Maven'  // Jenkins resolves mvn from Manage Jenkins → Tools → Maven
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')  // kill the build if stuck
+        disableConcurrentBuilds()           // only one build per branch at a time
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    stages {
+        stage('Resolve test group') {
+            // env.CHANGE_ID is set by GitHub Branch Source plugin for PRs
+            // If it is set → this is a PR build → always force Smoke
+            // If not set   → manual/branch build → use the parameter
+        }
+
+        stage('Run tests') {
+            // mvn clean test -Dgroups=Smoke   (PR build)
+            // mvn clean test -Dgroups=Regression  (manual Regression build)
+            // mvn clean test                   (when TEST_GROUP=All)
+        }
+    }
+
+    post {
+        always {
+            junit 'target/surefire-reports/**/*.xml'  // publish test results
+            allure results: [[path: 'target/allure-results']]  // publish Allure report
+        }
+    }
+}
+```
 
 ---
 
-### Step 2 — Add GitHub credentials to Jenkins
+### One-time Jenkins setup (do this before first run)
 
-1. Generate a GitHub **Personal Access Token** with scopes: `repo`, `repo:status`.
-2. In Jenkins: **Manage Jenkins → Credentials → System → Global → Add Credentials**
+#### Step 1 — Install required plugins
+
+**Manage Jenkins → Plugins → Available plugins** — search and install:
+
+| Plugin | Why it is needed |
+|--------|-----------------|
+| **GitHub Branch Source** | Discovers PRs, posts ✅/❌ status back to GitHub |
+| **Pipeline** | Runs the `Jenkinsfile` declarative syntax |
+| **JUnit** | Reads Surefire XML and publishes test results per build |
+| **Allure Jenkins Plugin** | Generates and serves the interactive Allure HTML report |
+
+Restart Jenkins after installing all four.
+
+---
+
+#### Step 2 — Configure Maven in Jenkins Tools
+
+Jenkins cannot find `mvn` on its own unless you tell it where Maven lives.
+
+**Manage Jenkins → Tools → Maven installations → Add Maven**
+
+| Field | Value |
+|-------|-------|
+| Name | `Maven` ← **must be exactly this** (matches `tools { maven 'Maven' }` in Jenkinsfile) |
+| Install automatically | ❌ **uncheck** (you already have Maven locally) |
+| MAVEN_HOME | `/opt/homebrew/Cellar/maven36/3.6.3/libexec` ← your local Maven path |
+
+Click **Save**.
+
+> To find your Maven path: run `mvn --version` in terminal — it prints `Maven home: <path>`. Use that path.
+
+---
+
+#### Step 3 — Configure Allure Commandline in Jenkins Tools
+
+The Allure Jenkins Plugin needs Allure CLI to generate the report.
+
+**Manage Jenkins → Tools → Allure Commandline → Add Allure Commandline**
+
+| Field | Value |
+|-------|-------|
+| Name | `allure` ← default, must match |
+| Install automatically | ✅ checked |
+| Version | `2.27.0` |
+
+Click **Save**. Jenkins downloads Allure CLI on first use.
+
+---
+
+#### Step 4 — Add GitHub credentials to Jenkins
+
+1. **GitHub → Settings → Developer settings → Personal access tokens → Generate new token**
+   - Scopes: ✅ `repo` and ✅ `repo:status`
+   - Copy the token (shown only once)
+
+2. **Manage Jenkins → Credentials → System → Global credentials → Add Credentials**
    - Kind: `Username with password`
    - Username: your GitHub username
-   - Password: the token
-   - ID: `github-credentials` *(use this exact ID — the Jenkinsfile references it implicitly via the Branch Source config)*
+   - Password: paste the token
+   - ID: `github-credentials`
+   - Click **Save**
 
 ---
 
-### Step 3 — Create the Jenkins job
+#### Step 5 — Create the Multibranch Pipeline job
 
-1. Jenkins dashboard → **New Item**.
-2. Name it (e.g. `restful-booker-tests`), select **Multibranch Pipeline** → OK.
-3. Under **Branch Sources** → Add source → **GitHub**.
-   - Credentials: select `github-credentials`.
-   - Repository URL: `https://github.com/<your-org>/<your-repo>`
-4. Under **Build Configuration** → Mode: `by Jenkinsfile` → Script Path: `Jenkinsfile`.
-5. Under **Scan Multibranch Pipeline Triggers**: check **Periodically if not otherwise run** → interval: `1 minute` *(or configure a GitHub webhook below for instant triggers)*.
-6. Click **Save** — Jenkins will immediately scan and build all discovered branches.
+1. Jenkins dashboard → **New Item**
+2. Name: `restful-booker-tests` → select **Multibranch Pipeline** → click **OK**
+3. **Branch Sources** → Add source → **GitHub**
+   - Credentials: `github-credentials`
+   - Repository HTTPS URL: `https://github.com/<your-username>/NextBillionAssignment`
+   - Click **Validate** (should say "Credentials OK")
+4. **Build Configuration** → Mode: `by Jenkinsfile` → Script Path: `Jenkinsfile`
+5. **Scan Multibranch Pipeline Triggers** → check **Periodically if not otherwise run** → `1 minute`
+6. Click **Save** — Jenkins scans the repo and builds all discovered branches immediately
 
 ---
 
-### Step 4 — Configure a GitHub webhook (instant PR triggers)
+#### Step 6 — Connect GitHub to Jenkins via webhook (for instant PR triggers)
 
-Without a webhook, Jenkins polls on a schedule. For instant PR triggers:
+> ⚠️ **GitHub Free plan constraint**: Instant webhook-based PR triggering and enforced branch protection rules (blocking merges on failed checks) require a **GitHub Team or Enterprise plan** for private repositories. On a free plan with a private repo, webhooks can be configured but the merge-blocking gate is not available.
 
-1. GitHub repo → **Settings → Webhooks → Add webhook**.
+Without a webhook, Jenkins only checks for new PRs on a polling schedule (1 min delay).
+With a webhook, Jenkins is notified instantly when a PR is opened.
+
+1. **GitHub repo → Settings → Webhooks → Add webhook**
 2. Payload URL: `http://<your-jenkins-host>/github-webhook/`
+   > If Jenkins runs locally (e.g. `localhost:8080`), expose it via: `ngrok http 8080`
+   > New ngrok URLs look like `https://abc123.ngrok-free.app` — use `https://abc123.ngrok-free.app/github-webhook/`
 3. Content type: `application/json`
-4. Events: select **Pull requests** and **Pushes**.
-5. Click **Add webhook**.
+4. Events: **Let me select individual events** → check ✅ **Pull requests** and ✅ **Pushes**
+5. Click **Add webhook** — GitHub sends a ping; you should see a green ✅ next to the webhook
 
 ---
 
-### Step 5 — Configure GitHub branch protection
+#### Workaround — Manually trigger Jenkins scan for new PRs (Free plan)
 
-1. GitHub repo → **Settings → Branches → Add branch protection rule**.
-2. Branch name pattern: `main` (or `master`).
+When webhooks cannot auto-trigger builds (e.g. Jenkins running on `localhost` unreachable by GitHub, or free-plan private repo), use the **manual scan** approach:
+
+1. Open a Pull Request on GitHub as usual
+2. Go to Jenkins → `restful-booker-tests` (the Multibranch Pipeline job)
+3. Left sidebar → **Scan Multibranch Pipeline Now**
+4. Wait ~10 seconds → click **Scan Multibranch Pipeline Log** to confirm Jenkins detected the PR
+5. A new `PR-<number>` job appears under the pipeline — click it to watch the Smoke tests run
+6. Once the build completes, Jenkins posts the status (`✅` or `❌`) back to the GitHub PR page under **Checks**
+
+> This manual scan step replaces the automatic webhook trigger. Everything else — Smoke test execution, Allure report generation, and GitHub status posting — works identically.
+
+---
+
+#### Step 7 — Set GitHub branch protection to block PR merges
+
+> ⚠️ **GitHub Free plan constraint**: **Required status checks** (which block the merge button until Jenkins passes) are only available for **public repositories** on the free plan, or any repository on a paid plan (Team/Enterprise). For private repos on the free plan, Jenkins still posts a status to the PR, but the merge button is not blocked automatically.
+
+> **Workaround for free plan private repos**: Rely on team discipline — the Jenkins check result is clearly visible on the PR page. Merge only when the `continuous-integration/jenkins/pr-head` check shows ✅.
+
+For repositories where branch protection IS available:
+
+1. **GitHub repo → Settings → Branches → Add branch protection rule**
+2. Branch name pattern: `main`
 3. Enable:
    - ✅ **Require status checks to pass before merging**
    - ✅ **Require branches to be up to date before merging**
-4. In the search box under status checks, find and select the Jenkins context — it appears as `continuous-integration/jenkins/pr-merge` or the job name (e.g. `restful-booker-tests/PR-*`). **Run at least one PR build first** so the status check name appears in the list.
-5. Optionally enable **Require pull request reviews** for an extra gate.
-6. Click **Save changes**.
+4. In the status check search box, type `jenkins` — select the check that appears
+   (looks like `Jenkins` or `continuous-integration/jenkins/pr-merge`)
+5. Click **Save changes**
+
+---
+
+### How to run tests manually in Jenkins (by tag)
+
+![Jenkins Build with Parameters](docs/images/jenkins-build-with-parameters.png)
+
+1. Jenkins → `restful-booker-tests` → click the branch (e.g. `main`)
+2. Left sidebar → **Build with Parameters**
+3. Select `TEST_GROUP` from the dropdown:
+
+| Value | Tests run | Approx time |
+|-------|-----------|-------------|
+| `Smoke` | 20 critical path tests | ~30 s |
+| `Regression` | All 98 tests | ~46 s |
+| `ExistingDefect` | Tests documenting API bugs | ~10 s |
+| `All` | All 98 tests (no group filter) | ~46 s |
+
+4. Click **Build**
+
+You can also trigger via Jenkins REST API:
+```bash
+# Run Regression tests on main branch
+curl -X POST "http://localhost:8080/job/restful-booker-tests/job/main/buildWithParameters" \
+     --user "<jenkins-user>:<jenkins-api-token>" \
+     --data "TEST_GROUP=Regression"
+```
+
+---
+
+### How to verify that a new PR triggers Smoke tests
+
+Follow these steps to confirm the PR → Smoke test → merge gate is working:
+
+**1. Create a feature branch**
+```bash
+git checkout main
+git pull origin main
+git checkout -b test/verify-ci-smoke
+```
+
+**2. Make any small change** (e.g. add a comment to `README.md`) and push:
+```bash
+git add README.md
+git commit -m "test: verify CI smoke gate"
+git push origin test/verify-ci-smoke
+```
+
+**3. Open a Pull Request**
+- GitHub repo → **Pull requests → New pull request**
+- Base: `main` ← Compare: `test/verify-ci-smoke`
+- Click **Create pull request**
+
+**4. Watch Jenkins pick it up**
+
+Within ~1 minute (or instantly if webhook is configured), you will see on the PR page:
+
+```
+Some checks haven't completed yet
+  ⏳  Jenkins — Pending
+```
+
+Jenkins console will show:
+```
+PR build detected (PR #N) — forcing group: Smoke
++ mvn clean test -Dgroups=Smoke -B --no-transfer-progress
+Tests run: 20, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+**5. After tests pass** — PR page shows:
+
+> 📎 **Sample PR**: [NextBillionAssignment/pull/1](https://github.com/jagadeeshkumar-1/NextBillionAssignment/pull/1) — real example where Jenkins ran Smoke tests and posted the check result.
+
+![GitHub PR checks passed](docs/images/github-pr-checks-passed.png)
+
+```
+✅  All checks have passed
+   Jenkins — Successful in 35s     Details
+   This branch has no conflicts with the base branch
+   Merging can be performed automatically.  [Merge pull request]
+```
+
+**6. To test the BLOCK behaviour** — temporarily break a test assertion, push to the branch, open a PR:
+```
+❌  Some checks were not successful
+   Jenkins — Failing after 30s     Details
+   Required status check "Jenkins" is failing
+   Merging is blocked
+```
+
+---
+
+### Viewing the Allure report in Jenkins
+
+![Allure Report Overview](docs/images/allure-report-overview.png)
+
+After each build:
+1. Jenkins → `restful-booker-tests` → branch or PR build → click the build number (e.g. `#8`)
+2. Left sidebar → **Allure Report** link
+3. The interactive report opens showing:
+   - **Overview** — donut chart: passed / failed / broken / skipped
+   - **Suites** — tests grouped by class (`AuthenticationTest`, `DeleteBookingsTest`, etc.)
+   - **Failed tests** — full assertion message + stack trace
+   - **Broken tests** — unexpected exceptions
+   - **Tags** — filter by `Smoke`, `Regression`, `ExistingDefect`
+
+To view the trend across builds, go to the **job page** (not a specific build) — you will see the **Allure Trend** graph showing pass/fail history.
+
+---
+
+### Viewing the Allure report locally (without Jenkins)
+
+```bash
+# Run tests + open report in browser in one command
+mvn clean test && mvn allure:serve
+
+# Or run a specific group first
+mvn clean test -Dgroups=Smoke && mvn allure:serve
+```
+
+`mvn allure:serve` starts a local Jetty server and opens the report in your default browser automatically.
 
 ---
 
 ### How it works end-to-end
 
 ```
-Developer opens PR
-        │
-        ▼
-GitHub webhook fires → Jenkins picks up PR build
-        │
-        ▼
-Jenkinsfile detects CHANGE_ID → resolves group to "Smoke"
-        │
-        ▼
-mvn clean test -Dgroups=Smoke
-        │
-   ┌────┴────┐
- PASS      FAIL
-   │          │
-   ▼          ▼
-GitHub     GitHub
-status ✅  status ❌
-(merge     (merge
-allowed)   blocked)
+Developer opens PR on GitHub
+          │
+          ▼
+GitHub webhook fires → Jenkins Multibranch Pipeline picks up PR
+          │
+          ▼
+Jenkinsfile: env.CHANGE_ID is set → RESOLVED_GROUP = "Smoke"
+          │
+          ▼
+mvn clean test -Dgroups=Smoke  (20 tests, ~30s)
+          │
+    ┌─────┴─────┐
+  PASS        FAIL
+    │            │
+    ▼            ▼
+GitHub ✅     GitHub ❌
+status OK    status FAIL
+Merge         Merge
+allowed       BLOCKED
+    │
+    ▼
+Allure report generated
+and published in Jenkins
 ```
 
 ---
 
-### Running specific groups from Jenkins manually
+### Troubleshooting
 
-1. Jenkins → job → **Build with Parameters**.
-2. Select `TEST_GROUP`: `Smoke` / `Regression` / `ExistingDefect` / `All`.
-3. Click **Build** — the chosen group runs against whichever branch you trigger from.
-
-Or from CLI using the Jenkins REST API:
-```bash
-curl -X POST "http://<jenkins>/job/restful-booker-tests/job/main/buildWithParameters" \
-     --user "<user>:<api-token>" \
-     --data "TEST_GROUP=Regression"
-```
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `mvn: command not found` | Maven not in Jenkins PATH | Configure Maven in Manage Jenkins → Tools |
+| `No Allure CLI installation found` | Allure Commandline not configured | Configure in Manage Jenkins → Tools → Allure Commandline |
+| `Tool type "maven" does not have an install of "Maven"` | Name mismatch | Ensure name is exactly `Maven` in Tools config |
+| PR build not triggering | Webhook not set up | Add webhook in GitHub repo Settings or wait 1 min for polling |
+| Status check not appearing in branch protection | No PR build has run yet | Run one PR build first, then add the status check |
+| Keychain prompt appears on every build | macOS asking for git credentials | Click **Always Allow** once — it won't ask again |
