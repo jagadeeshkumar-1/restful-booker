@@ -1,0 +1,80 @@
+name: API Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_group:
+        description: 'Test group to run'
+        required: false
+        default: 'Smoke'
+        type: choice
+        options:
+          - Smoke
+          - Regression
+          - ExistingDefect
+          - All
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Resolve test group
+        id: group
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "group=Smoke" >> "$GITHUB_OUTPUT"
+            echo "PR build — forcing group: Smoke"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "group=${{ inputs.test_group }}" >> "$GITHUB_OUTPUT"
+            echo "Manual trigger — group: ${{ inputs.test_group }}"
+          else
+            echo "group=Smoke" >> "$GITHUB_OUTPUT"
+            echo "Push build — running Smoke"
+          fi
+
+      - name: Run tests
+        run: |
+          GROUP="${{ steps.group.outputs.group }}"
+          if [ "$GROUP" = "All" ]; then
+            mvn clean test -B --no-transfer-progress
+          else
+            mvn clean test -Dgroups="$GROUP" -B --no-transfer-progress
+          fi
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: TestNG Results
+          path: target/surefire-reports/junitreports/*.xml
+          reporter: java-junit
+
+      - name: Generate Allure report
+        uses: simple-elf/allure-report-action@v1.9
+        if: always()
+        with:
+          allure_results: target/allure-results
+          allure_history: allure-history
+
+      - name: Upload Allure report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 30

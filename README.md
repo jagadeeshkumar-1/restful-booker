@@ -18,7 +18,9 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 8. [Test Coverage](#test-coverage)
 9. [Confirmed API Defects](#confirmed-api-defects)
 10. [Design Decisions](#design-decisions)
-11. [CI / Jenkins Setup](#ci--jenkins-setup)
+11. [CI / CD](#ci--cd)
+12. [AI Tool Usage](#ai-tool-usage)
+13. [What I'd Do Next](#what-id-do-next)
 
 ---
 
@@ -26,7 +28,7 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Java | 11 | Language |
+| Java | 17 | Language |
 | Maven | 3.x | Build & dependency management |
 | Rest Assured | 5.4.0 | HTTP client for API testing |
 | TestNG | 7.9.0 | Test framework & runner |
@@ -41,13 +43,13 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 
 ## Prerequisites
 
-- **Java 11+** installed and `JAVA_HOME` set
+- **Java 17+** installed and `JAVA_HOME` set
 - **Maven 3.6+** installed and available on `PATH`
 - Internet access to reach `https://restful-booker.herokuapp.com`
 
 Verify your environment:
 ```bash
-java -version   # should print 11 or higher
+java -version   # should print 17 or higher
 mvn -version    # should print 3.6 or higher
 ```
 
@@ -57,6 +59,10 @@ mvn -version    # should print 3.6 or higher
 
 ```
 NextBillionAssignment/
+├── .github/
+│   └── workflows/
+│       └── test.yml                                 # GitHub Actions CI workflow
+├── Jenkinsfile                                      # Jenkins Multibranch Pipeline (optional)
 ├── pom.xml                                          # Maven build + all dependencies
 └── src/
     └── test/
@@ -438,9 +444,38 @@ Measured over 5 full runs (95 tests at time of measurement; 3 additional GET /bo
 
 ---
 
-## CI / Jenkins Setup
+## CI / CD
 
-This project uses a **Jenkins Multibranch Pipeline** defined in `Jenkinsfile` at the repo root.
+This project supports **two CI options**: GitHub Actions (primary) and Jenkins (optional).
+
+---
+
+### GitHub Actions
+
+The workflow is defined in `.github/workflows/test.yml`.
+
+**What it does:**
+- **Every pull request** → runs **Smoke** tests automatically (~20 tests, ~30s)
+- **Every push to `main`** → runs **Smoke** tests
+- **Manual trigger** (`workflow_dispatch`) → choose any group: `Smoke`, `Regression`, `ExistingDefect`, `All`
+- Publishes **test results** per run (TestNG JUnit XML)
+- Generates and uploads **Allure report** as a build artifact (downloadable from the Actions run)
+
+**To run tests manually via GitHub Actions:**
+1. GitHub repo → **Actions** tab → **API Tests** workflow
+2. Click **Run workflow** → select branch and `test_group`
+3. Click **Run workflow** button
+
+**To download the Allure report:**
+1. Click into the completed workflow run
+2. Scroll to **Artifacts** → download `allure-report`
+3. Unzip and open `index.html` in a browser
+
+---
+
+### Jenkins Setup (optional)
+
+A `Jenkinsfile` is also provided for teams using Jenkins. It uses a **Multibranch Pipeline** job.
 
 ### What it does automatically
 - Every **pull request** → runs **Smoke** tests (forced, ~20 tests, ~30s)
@@ -790,3 +825,64 @@ and published in Jenkins
 | PR build not triggering | Webhook not set up | Add webhook in GitHub repo Settings or wait 1 min for polling |
 | Status check not appearing in branch protection | No PR build has run yet | Run one PR build first, then add the status check |
 | Keychain prompt appears on every build | macOS asking for git credentials | Click **Always Allow** once — it won't ask again |
+
+---
+
+## AI Tool Usage
+
+This project was developed with AI assistance. Below is a transparent breakdown of what was AI-assisted and what was done manually.
+
+| Area | AI Role | My Role |
+|------|---------|---------|
+| **Framework architecture** (BaseTest, ApiClient, BookingApiClient layering) | Reviewed and refined the layered design | Conceived the architecture, designed the Template Method pattern for multi-service extensibility |
+| **Test logic & assertions** | Pair-programmed: generated initial test skeletons, suggested edge cases | Defined all test scenarios, wrote assertion logic, identified and documented all 9 API defects |
+| **Model classes** (Booking, BookingDates, BookingResponse) | Suggested Lombok annotations | Designed the POJO structure to match API JSON contracts |
+| **CI/CD pipeline** (GitHub Actions, Jenkinsfile) | Generated workflow YAML and Jenkinsfile boilerplate, troubleshot Jenkins tool configuration | Defined the pipeline strategy (Smoke on PR, parameterized manual runs), configured Jenkins locally |
+| **README documentation** | Generated structured sections, tables, and formatting | Provided all technical content, reviewed and edited every section for accuracy |
+| **Allure integration** | Added dependencies, plugin config, and listener registration | Decided on Allure as the reporting tool, verified reports locally and in Jenkins |
+| **Debugging & troubleshooting** | Diagnosed Jenkins errors (Maven PATH, Allure CLI, CSP issues) | Executed fixes, validated in local Jenkins instance |
+
+**Tools used:** Windsurf IDE with Claude (Cascade) as the AI coding assistant.
+
+---
+
+## What I'd Do Next
+
+Given more time, these are the improvements I would prioritize:
+
+### 1. Data-Driven Parameterization
+Replace hardcoded test data with TestNG `@DataProvider` backed by external sources (CSV/JSON files). This would:
+- Make it trivial to add new test cases without writing new methods
+- Separate test data from test logic
+- Enable non-developers to contribute test scenarios
+
+### 2. Retry Logic for Flaky External API
+The Restful Booker demo API occasionally returns intermittent failures (timeouts, 500s). I would add:
+- TestNG `IRetryAnalyzer` with configurable max retries (e.g. 2)
+- Exponential backoff between retries
+- Clear logging to distinguish genuine failures from transient flakiness
+
+### 3. Contract Testing
+Add JSON Schema validation using `rest-assured-json-schema-validator` (dependency already available but unused):
+- Store expected schemas in `src/test/resources/schemas/`
+- Validate every response against its schema to catch structural regressions (missing fields, type changes)
+- This catches a different class of bugs than functional assertions
+
+### 4. Environment-Based Configuration Profiles
+Extend `config.properties` to support multiple environments:
+- `config-staging.properties`, `config-production.properties`
+- Select via `-Denv=staging` at runtime
+- Each profile with its own base URI, timeouts, and auth credentials
+
+### 5. Allure Annotations for Richer Reports
+Add `@Epic`, `@Feature`, `@Story`, and `@Step` annotations to test methods:
+- Group tests by business feature in the Allure report (e.g. "Booking Management", "Authentication")
+- Add `@Step` to `BookingApiClient` methods for detailed execution traces
+- Attach request/response logs to each step for debugging failed tests
+
+### 6. Additional Boundary & Security Tests
+- Test maximum payload sizes (what happens with a 10MB request body?)
+- Test concurrent booking creation for race conditions
+- Test rate limiting behavior (if the API enforces it)
+- Test with malformed JSON (missing quotes, trailing commas)
+- CORS header validation for browser-based consumers
