@@ -609,6 +609,8 @@ With a webhook, Jenkins is notified instantly when a PR is opened.
 
 ### How to run tests manually in Jenkins (by tag)
 
+![Jenkins Build with Parameters](docs/images/jenkins-build-with-parameters.png)
+
 1. Jenkins → `restful-booker-tests` → click the branch (e.g. `main`)
 2. Left sidebar → **Build with Parameters**
 3. Select `TEST_GROUP` from the dropdown:
@@ -674,6 +676,8 @@ BUILD SUCCESS
 
 **5. After tests pass** — PR page shows:
 
+![GitHub PR checks passed](docs/images/github-pr-checks-passed.png)
+
 ```
 ✅  All checks have passed
    Jenkins — Successful in 35s     Details
@@ -692,6 +696,8 @@ BUILD SUCCESS
 ---
 
 ### Viewing the Allure report in Jenkins
+
+![Allure Report Overview](docs/images/allure-report-overview.png)
 
 After each build:
 1. Jenkins → `restful-booker-tests` → branch or PR build → click the build number (e.g. `#8`)
