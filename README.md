@@ -579,6 +579,8 @@ Click **Save**. Jenkins downloads Allure CLI on first use.
 
 #### Step 6 — Connect GitHub to Jenkins via webhook (for instant PR triggers)
 
+> ⚠️ **GitHub Free plan constraint**: Instant webhook-based PR triggering and enforced branch protection rules (blocking merges on failed checks) require a **GitHub Team or Enterprise plan** for private repositories. On a free plan with a private repo, webhooks can be configured but the merge-blocking gate is not available.
+
 Without a webhook, Jenkins only checks for new PRs on a polling schedule (1 min delay).
 With a webhook, Jenkins is notified instantly when a PR is opened.
 
@@ -592,9 +594,28 @@ With a webhook, Jenkins is notified instantly when a PR is opened.
 
 ---
 
+#### Workaround — Manually trigger Jenkins scan for new PRs (Free plan)
+
+When webhooks cannot auto-trigger builds (e.g. Jenkins running on `localhost` unreachable by GitHub, or free-plan private repo), use the **manual scan** approach:
+
+1. Open a Pull Request on GitHub as usual
+2. Go to Jenkins → `restful-booker-tests` (the Multibranch Pipeline job)
+3. Left sidebar → **Scan Multibranch Pipeline Now**
+4. Wait ~10 seconds → click **Scan Multibranch Pipeline Log** to confirm Jenkins detected the PR
+5. A new `PR-<number>` job appears under the pipeline — click it to watch the Smoke tests run
+6. Once the build completes, Jenkins posts the status (`✅` or `❌`) back to the GitHub PR page under **Checks**
+
+> This manual scan step replaces the automatic webhook trigger. Everything else — Smoke test execution, Allure report generation, and GitHub status posting — works identically.
+
+---
+
 #### Step 7 — Set GitHub branch protection to block PR merges
 
-> Do this **after at least one PR build has completed** — the status check name must exist in GitHub before you can select it.
+> ⚠️ **GitHub Free plan constraint**: **Required status checks** (which block the merge button until Jenkins passes) are only available for **public repositories** on the free plan, or any repository on a paid plan (Team/Enterprise). For private repos on the free plan, Jenkins still posts a status to the PR, but the merge button is not blocked automatically.
+
+> **Workaround for free plan private repos**: Rely on team discipline — the Jenkins check result is clearly visible on the PR page. Merge only when the `continuous-integration/jenkins/pr-head` check shows ✅.
+
+For repositories where branch protection IS available:
 
 1. **GitHub repo → Settings → Branches → Add branch protection rule**
 2. Branch name pattern: `main`
