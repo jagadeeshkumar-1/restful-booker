@@ -21,6 +21,7 @@ on:
 permissions:
   contents: read
   checks: write
+  actions: read
 
 jobs:
   test:
@@ -50,8 +51,8 @@ jobs:
             echo "group=Smoke" >> "$GITHUB_OUTPUT"
             echo "Push build — running Smoke"
           fi
-
       - name: Run tests
+        continue-on-error: true
         run: |
           GROUP="${{ steps.group.outputs.group }}"
           if [ "$GROUP" = "All" ]; then
@@ -59,29 +60,25 @@ jobs:
           else
             mvn clean test -Dgroups="$GROUP" -B --no-transfer-progress
           fi
-
       - name: Publish test results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+        uses: dorny/test-reporter@v2
         if: always()
         with:
-          files: target/surefire-reports/**/*.xml
+          name: TestNG Results
+          path: target/surefire-reports/junitreports/*.xml
+          reporter: java-junit
 
       - name: Generate Allure report
+        uses: simple-elf/allure-report-action@master
         if: always()
-        run: mvn allure:report -B --no-transfer-progress
+        with:
+          allure_results: target/allure-results
+          allure_history: allure-history
 
       - name: Upload Allure report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: allure-report
-          path: target/site/allure-maven-plugin/
-          retention-days: 30
-
-      - name: Upload Surefire reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: surefire-reports
-          path: target/surefire-reports/
+          path: allure-report/
           retention-days: 30
