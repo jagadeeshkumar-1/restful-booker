@@ -475,8 +475,8 @@ The workflow is defined in `.github/workflows/test.yml`.
 | 3 | **Resolve test group** | Determines which test group to run — forces `Smoke` for PRs and pushes, uses the selected group for manual triggers |
 | 4 | **Run tests** | Executes `mvn clean test -Dgroups=<group>` to run the TestNG suite; `continue-on-error: true` ensures reporting steps still run even if tests fail |
 | 5 | **Publish test results** | Parses Surefire JUnit XML reports and posts them as a GitHub Check with pass/fail counts visible on the PR |
-| 6 | **Install Allure CLI** | Downloads Allure Commandline 2.27.0 and adds it to the runner's `PATH` |
-| 7 | **Generate Allure report (single file)** | Runs `allure generate --single-file` to produce a self-contained `index.html` — opens directly in any browser without a server |
+| 6 | **Install Allure CLI** | Downloads Allure Commandline 2.27.0 onto the GitHub Actions VM (no local install needed) |
+| 7 | **Generate Allure report (single file)** | Runs `allure generate --single-file` on the VM to produce a self-contained `index.html` — download and open directly in any browser, no server needed |
 | 8 | **Upload Allure report** | Uploads the generated Allure HTML report as a downloadable build artifact (retained for 30 days) |
 
 #### To run tests manually via GitHub Actions
