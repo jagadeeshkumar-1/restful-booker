@@ -18,6 +18,11 @@ on:
           - ExistingDefect
           - All
 
+permissions:
+  contents: read
+  checks: write
+  actions: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -48,6 +53,7 @@ jobs:
           fi
 
       - name: Run tests
+        continue-on-error: true
         run: |
           GROUP="${{ steps.group.outputs.group }}"
           if [ "$GROUP" = "All" ]; then
@@ -57,7 +63,7 @@ jobs:
           fi
 
       - name: Publish test results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         if: always()
         with:
           name: TestNG Results
@@ -65,7 +71,7 @@ jobs:
           reporter: java-junit
 
       - name: Generate Allure report
-        uses: simple-elf/allure-report-action@v1.9
+        uses: simple-elf/allure-report-action@master
         if: always()
         with:
           allure_results: target/allure-results
