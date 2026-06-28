@@ -68,14 +68,20 @@ jobs:
           path: target/surefire-reports/junitreports/*.xml
           reporter: java-junit
 
-      - name: Generate Allure report
+      - name: Install Allure CLI
         if: always()
-        run: mvn allure:report -B --no-transfer-progress
+        run: |
+          curl -sL https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz | tar -xz
+          echo "$PWD/allure-2.27.0/bin" >> "$GITHUB_PATH"
+
+      - name: Generate Allure report (single file)
+        if: always()
+        run: allure generate target/allure-results --single-file -o allure-report --clean
 
       - name: Upload Allure report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: allure-report
-          path: target/site/allure-maven-plugin/
+          path: allure-report/
           retention-days: 30
