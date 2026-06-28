@@ -21,7 +21,6 @@ on:
 permissions:
   contents: read
   checks: write
-  actions: read
 
 jobs:
   test:
@@ -53,7 +52,6 @@ jobs:
           fi
 
       - name: Run tests
-        continue-on-error: true
         run: |
           GROUP="${{ steps.group.outputs.group }}"
           if [ "$GROUP" = "All" ]; then
@@ -63,24 +61,27 @@ jobs:
           fi
 
       - name: Publish test results
-        uses: dorny/test-reporter@v2
+        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          name: TestNG Results
-          path: target/surefire-reports/junitreports/*.xml
-          reporter: java-junit
+          files: target/surefire-reports/**/*.xml
 
       - name: Generate Allure report
-        uses: simple-elf/allure-report-action@master
         if: always()
-        with:
-          allure_results: target/allure-results
-          allure_history: allure-history
+        run: mvn allure:report -B --no-transfer-progress
 
       - name: Upload Allure report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: allure-report
-          path: allure-report/
+          path: target/site/allure-maven-plugin/
+          retention-days: 30
+
+      - name: Upload Surefire reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
           retention-days: 30
