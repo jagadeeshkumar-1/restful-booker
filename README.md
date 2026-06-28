@@ -484,11 +484,16 @@ The workflow is defined in `.github/workflows/test.yml`.
 2. Click **Run workflow** → select branch and `test_group`
 3. Click **Run workflow** button
 
-#### To download the Allure report
+#### To view the Allure report from GitHub Actions
 
 1. Click into the completed workflow run
 2. Scroll to **Artifacts** → download `allure-report`
-3. Unzip and open `index.html` in a browser
+3. Unzip the archive, then serve it locally (browsers block `file://` AJAX requests):
+   ```bash
+   cd allure-report
+   python3 -m http.server 9090
+   ```
+4. Open `http://localhost:9090` in your browser — the full interactive Allure report loads correctly
 
 ---
 
