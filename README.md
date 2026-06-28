@@ -454,19 +454,38 @@ This project supports **two CI options**: GitHub Actions (primary) and Jenkins (
 
 The workflow is defined in `.github/workflows/test.yml`.
 
-**What it does:**
-- **Every pull request** → runs **Smoke** tests automatically (~20 tests, ~30s)
-- **Every push to `main`** → runs **Smoke** tests
-- **Manual trigger** (`workflow_dispatch`) → choose any group: `Smoke`, `Regression`, `ExistingDefect`, `All`
-- Publishes **test results** per run (TestNG JUnit XML)
-- Generates and uploads **Allure report** as a build artifact (downloadable from the Actions run)
+> 📎 **Live proof:** [GitHub Actions run #28319134065](https://github.com/jagadeeshkumar-1/restful-booker/actions/runs/28319134065) — real workflow execution showing all steps passing.
 
-**To run tests manually via GitHub Actions:**
+![GitHub Actions workflow run](docs/images/github-actions-run.png)
+
+#### Workflow triggers
+
+| Trigger | When it fires | Test group |
+|---------|--------------|------------|
+| `pull_request` | PR opened/updated against `main` | **Smoke** (forced) |
+| `push` | Code pushed to `main` | **Smoke** |
+| `workflow_dispatch` | Manual trigger from Actions tab | User's choice (`Smoke`, `Regression`, `ExistingDefect`, `All`) |
+
+#### Step-by-step breakdown
+
+| # | Step | What it does |
+|---|------|-------------|
+| 1 | **Checkout code** | Clones the repository into the runner using `actions/checkout@v4` |
+| 2 | **Set up JDK 17** | Installs Temurin JDK 17 and caches Maven dependencies for faster subsequent runs |
+| 3 | **Resolve test group** | Determines which test group to run — forces `Smoke` for PRs and pushes, uses the selected group for manual triggers |
+| 4 | **Run tests** | Executes `mvn clean test -Dgroups=<group>` to run the TestNG suite; `continue-on-error: true` ensures reporting steps still run even if tests fail |
+| 5 | **Publish test results** | Parses Surefire JUnit XML reports and posts them as a GitHub Check with pass/fail counts visible on the PR |
+| 6 | **Generate Allure report** | Converts raw `target/allure-results/` JSON into an interactive HTML report |
+| 7 | **Upload Allure report** | Uploads the generated Allure HTML report as a downloadable build artifact (retained for 30 days) |
+
+#### To run tests manually via GitHub Actions
+
 1. GitHub repo → **Actions** tab → **API Tests** workflow
 2. Click **Run workflow** → select branch and `test_group`
 3. Click **Run workflow** button
 
-**To download the Allure report:**
+#### To download the Allure report
+
 1. Click into the completed workflow run
 2. Scroll to **Artifacts** → download `allure-report`
 3. Unzip and open `index.html` in a browser
