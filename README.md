@@ -697,6 +697,8 @@ BUILD SUCCESS
 
 **5. After tests pass** — PR page shows:
 
+> 📎 **Sample PR**: [NextBillionAssignment/pull/1](https://github.com/jagadeeshkumar-1/NextBillionAssignment/pull/1) — real example where Jenkins ran Smoke tests and posted the check result.
+
 ![GitHub PR checks passed](docs/images/github-pr-checks-passed.png)
 
 ```
