@@ -33,6 +33,8 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 | Jackson | 2.17.1 | JSON serialization / deserialization |
 | Lombok | 1.18.32 | Eliminates boilerplate getters/setters in model classes |
 | Hamcrest | 2.2 | Assertion matchers |
+| Allure TestNG | 2.27.0 | Test result collection for HTML reports |
+| Allure Maven | 2.12.0 | Generates interactive HTML report (`mvn allure:serve`) |
 | Maven Surefire | 3.2.5 | Test execution plugin |
 
 ---
@@ -583,7 +585,7 @@ With a webhook, Jenkins is notified instantly when a PR is opened.
 1. **GitHub repo → Settings → Webhooks → Add webhook**
 2. Payload URL: `http://<your-jenkins-host>/github-webhook/`
    > If Jenkins runs locally (e.g. `localhost:8080`), expose it via: `ngrok http 8080`
-   > and use the `https://xxxx.ngrok.io/github-webhook/` URL instead.
+   > New ngrok URLs look like `https://abc123.ngrok-free.app` — use `https://abc123.ngrok-free.app/github-webhook/`
 3. Content type: `application/json`
 4. Events: **Let me select individual events** → check ✅ **Pull requests** and ✅ **Pushes**
 5. Click **Add webhook** — GitHub sends a ping; you should see a green ✅ next to the webhook
