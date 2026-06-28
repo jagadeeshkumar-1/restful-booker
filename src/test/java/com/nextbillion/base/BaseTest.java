@@ -28,7 +28,7 @@ public abstract class BaseTest {
                         .defaultObjectMapperType(ObjectMapperType.JACKSON_2));
 
         requestSpec = new RequestSpecBuilder()
-                .setBaseUri(baseUris)
+                .setBaseUri(baseUri)
                 .setContentType(ContentType.JSON)
                 .setAccept("application/json")
                 .setConfig(RestAssured.config)
