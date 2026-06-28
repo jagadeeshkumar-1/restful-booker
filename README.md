@@ -491,6 +491,8 @@ The workflow is defined in `.github/workflows/test.yml`.
 2. Scroll to **Artifacts** → download `allure-report`
 3. Unzip and open `index.html` directly in your browser — the report is generated as a **single self-contained HTML file** so no local server is needed
 
+> 📎 **Sample report:** A sample Allure report from a real CI run is available at [`docs/allure-report/index.html`](docs/allure-report/index.html) — clone the repo and open it in your browser to see the interactive test results.
+
 ---
 
 ### Jenkins Setup (optional)
