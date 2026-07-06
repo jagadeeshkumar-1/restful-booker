@@ -2,6 +2,24 @@
 
 A comprehensive REST API test automation framework for the [Restful Booker](https://restful-booker.herokuapp.com) API, built with **Java + Rest Assured + TestNG + Maven**.
 
+
+## Technology Stack
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Java | 17 | Language |
+| Maven | 3.x | Build & dependency management |
+| Rest Assured | 5.4.0 | HTTP client for API testing |
+| TestNG | 7.9.0 | Test framework & runner |
+| Jackson | 2.17.1 | JSON serialization / deserialization |
+| Lombok | 1.18.32 | Eliminates boilerplate getters/setters in model classes |
+| Hamcrest | 2.2 | Assertion matchers |
+| Allure TestNG | 2.27.0 | Test result collection for HTML reports |
+| Allure Maven | 2.12.0 | Generates interactive HTML report (`mvn allure:serve`) |
+| Maven Surefire | 3.2.5 | Test execution plugin |
+
+---
+
 > **Average suite execution time: ~46 seconds** (measured over 5 runs with parallel execution, 98 tests)
 
 ---
@@ -24,22 +42,7 @@ A comprehensive REST API test automation framework for the [Restful Booker](http
 
 ---
 
-## Technology Stack
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Java | 17 | Language |
-| Maven | 3.x | Build & dependency management |
-| Rest Assured | 5.4.0 | HTTP client for API testing |
-| TestNG | 7.9.0 | Test framework & runner |
-| Jackson | 2.17.1 | JSON serialization / deserialization |
-| Lombok | 1.18.32 | Eliminates boilerplate getters/setters in model classes |
-| Hamcrest | 2.2 | Assertion matchers |
-| Allure TestNG | 2.27.0 | Test result collection for HTML reports |
-| Allure Maven | 2.12.0 | Generates interactive HTML report (`mvn allure:serve`) |
-| Maven Surefire | 3.2.5 | Test execution plugin |
-
----
 
 ## Prerequisites
 
