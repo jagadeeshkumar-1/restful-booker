@@ -1,12 +1,15 @@
 package com.nextbillion.service.booker.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nextbillion.core.HttpStatus;
+import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.BookerBaseTest;
 import com.nextbillion.service.booker.model.Booking;
-import com.nextbillion.service.booker.model.BookingDates;
 import com.nextbillion.service.booker.model.BookingResponse;
+import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -16,8 +19,11 @@ import static org.testng.Assert.assertEquals;
 /**
  * POST /booking tests.
  * Covers: positive (round-trip), negative (missing/invalid fields), boundary, security (injection).
+ * All test data is loaded from {@code src/test/resources/testdata/create-bookings.json}.
  */
 public class CreateBookingsTest extends BookerBaseTest {
+
+    private static final JsonNode DATA = TestDataProvider.loadTree("create-bookings.json");
 
     // -----------------------------------------------------------------------
     // POSITIVE
@@ -25,44 +31,41 @@ public class CreateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "POST /booking with all valid fields returns 200 and created booking in response body")
     public void createWithAllFields_returnsFullResponse() {
-        Booking payload = new Booking("Alice", "Smith", 250, true,
-                new BookingDates("2025-06-01", "2025-06-07"), "Breakfast");
+        Booking payload = TestDataProvider.getAs(DATA.path("positive"), "allFields", Booking.class);
 
         BookingResponse response = bookingClient.createBooking(payload);
 
         assertThat(response.getBookingid(), greaterThan(0));
-        assertEquals(response.getBooking().getFirstname(),                  "Alice");
-        assertEquals(response.getBooking().getLastname(),                   "Smith");
-        assertEquals(response.getBooking().getTotalprice(),                 250);
-        assertEquals(response.getBooking().isDepositpaid(),                 true);
-        assertEquals(response.getBooking().getBookingdates().getCheckin(),  "2025-06-01");
-        assertEquals(response.getBooking().getBookingdates().getCheckout(), "2025-06-07");
-        assertEquals(response.getBooking().getAdditionalneeds(),            "Breakfast");
+        assertEquals(response.getBooking().getFirstname(),                  payload.getFirstname());
+        assertEquals(response.getBooking().getLastname(),                   payload.getLastname());
+        assertEquals(response.getBooking().getTotalprice(),                 payload.getTotalprice());
+        assertEquals(response.getBooking().isDepositpaid(),                 payload.isDepositpaid());
+        assertEquals(response.getBooking().getBookingdates().getCheckin(),  payload.getBookingdates().getCheckin());
+        assertEquals(response.getBooking().getBookingdates().getCheckout(), payload.getBookingdates().getCheckout());
+        assertEquals(response.getBooking().getAdditionalneeds(),            payload.getAdditionalneeds());
     }
 
     @Test(groups = {"Smoke", "Regression"}, description = "POST /booking: created booking is retrievable by its returned ID")
     public void createdBooking_isRetrievableById() {
-        Booking payload = new Booking("Bob", "Jones", 180, false,
-                new BookingDates("2025-07-10", "2025-07-15"), "Lunch");
+        Booking payload = TestDataProvider.getAs(DATA.path("positive"), "retrievable", Booking.class);
 
         int id = bookingClient.createAndGetId(payload);
 
         bookingClient.getBookingById(id)
                 .then()
                 .statusCode(200)
-                .body("firstname",             equalTo("Bob"))
-                .body("lastname",              equalTo("Jones"))
-                .body("totalprice",            equalTo(180))
-                .body("depositpaid",           equalTo(false))
-                .body("bookingdates.checkin",  equalTo("2025-07-10"))
-                .body("bookingdates.checkout", equalTo("2025-07-15"))
-                .body("additionalneeds",       equalTo("Lunch"));
+                .body("firstname",             equalTo(payload.getFirstname()))
+                .body("lastname",              equalTo(payload.getLastname()))
+                .body("totalprice",            equalTo(payload.getTotalprice()))
+                .body("depositpaid",           equalTo(payload.isDepositpaid()))
+                .body("bookingdates.checkin",  equalTo(payload.getBookingdates().getCheckin()))
+                .body("bookingdates.checkout", equalTo(payload.getBookingdates().getCheckout()))
+                .body("additionalneeds",       equalTo(payload.getAdditionalneeds()));
     }
 
     @Test(groups = {"Smoke", "Regression"}, description = "POST /booking with depositpaid=false is persisted correctly")
     public void createWithDepositFalse_persistsCorrectly() {
-        Booking payload = new Booking("Carl", "Null", 50, false,
-                new BookingDates("2025-08-01", "2025-08-03"), "None");
+        Booking payload = TestDataProvider.getAs(DATA.path("positive"), "depositFalse", Booking.class);
 
         BookingResponse response = bookingClient.createBooking(payload);
         assertThat(response.getBooking().isDepositpaid(), is(false));
@@ -70,8 +73,7 @@ public class CreateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "POST /booking with zero price is accepted and round-trips correctly")
     public void createWithZeroPrice_isAccepted() {
-        Booking payload = new Booking("Zero", "Price", 0, true,
-                new BookingDates("2025-09-01", "2025-09-02"), "None");
+        Booking payload = TestDataProvider.getAs(DATA.path("positive"), "zeroPrice", Booking.class);
 
         BookingResponse response = bookingClient.createBooking(payload);
         assertEquals(response.getBooking().getTotalprice(), 0);
@@ -79,71 +81,70 @@ public class CreateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "POST /booking with very long additionalneeds string is handled gracefully")
     public void createWithLongNotes_isHandledGracefully() {
-        String longNeeds = "Extra ".repeat(100).trim();
-        Booking payload = new Booking("Long", "Needs", 100, true,
-                new BookingDates("2025-10-01", "2025-10-05"), longNeeds);
+        Booking payload = TestDataProvider.getAs(DATA.path("positive"), "longNotes", Booking.class);
+        String notes = payload.getAdditionalneeds();
+        if (notes != null && notes.startsWith("LONG_REPEAT:")) {
+            String[] parts = notes.substring("LONG_REPEAT:".length()).split(":");
+            payload.setAdditionalneeds(parts[0].repeat(Integer.parseInt(parts[1])).trim());
+        }
 
         bookingClient.createBookingRaw(payload)
                 .then()
-                .statusCode(anyOf(is(200), is(400), is(413)));
+                .statusCode(HttpStatus.OK);
     }
 
     // -----------------------------------------------------------------------
-    // NEGATIVE
+    // NEGATIVE — DataProvider-driven
     // -----------------------------------------------------------------------
 
-    @Test(groups = {"Regression"}, description = "POST /booking with completely empty body returns 4xx or 5xx — not 200")
-    public void createWithEmptyBody_returnsError() {
-        bookingClient.createBookingRaw(Map.of())
-                .then()
-                .statusCode(anyOf(is(400), is(500)));
+    @DataProvider(name = "negativeData")
+    public Object[][] negativeData() {
+        return TestDataProvider.toDataProvider(DATA, "negative");
     }
 
-    @Test(groups = {"Regression"}, description = "POST /booking without bookingdates returns error")
-    public void createWithoutDates_returnsError() {
-        Map<String, Object> body = Map.of(
-                "firstname",   "NoDate",
-                "lastname",    "User",
-                "totalprice",  100,
-                "depositpaid", true
-        );
+    @Test(groups = {"Regression"}, dataProvider = "negativeData",
+          description = "POST /booking with invalid data returns expected error status")
+    public void createWithInvalidData_returnsExpectedStatus(String testName, Map<String, Object> body,
+                                                             int expectedStatus, String description) {
         bookingClient.createBookingRaw(body)
                 .then()
-                .statusCode(anyOf(is(400), is(500)));
+                .statusCode(expectedStatus);
     }
 
-    @Test(groups = {"Regression"}, description = "POST /booking with negative totalprice is rejected or stored as-is (no server crash)")
-    public void createWithNegativePrice_doesNotCrash() {
-        Booking payload = new Booking("Negative", "Price", -1, false,
-                new BookingDates("2025-11-01", "2025-11-05"), "None");
+    // -----------------------------------------------------------------------
+    // NEGATIVE — Missing individual required fields (DataProvider)
+    // -----------------------------------------------------------------------
 
-        bookingClient.createBookingRaw(payload)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
+    @DataProvider(name = "missingFieldsData")
+    public Object[][] missingFieldsData() {
+        return TestDataProvider.toDataProvider(DATA, "negativeMissingFields");
     }
 
-    @Test(groups = {"Regression"}, description = "POST /booking with malformed date format returns error")
-    public void createWithMalformedDates_returnsError() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Bad",
-                "lastname",     "Date",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "not-a-date", "checkout", "also-bad")
-        );
+    @Test(groups = {"Regression"}, dataProvider = "missingFieldsData",
+          description = "POST /booking without a required field returns error")
+    public void createWithMissingField_returnsError(String testName, Map<String, Object> body,
+                                                     int expectedStatus, String description) {
         bookingClient.createBookingRaw(body)
                 .then()
-                .statusCode(anyOf(is(200), is(400), is(500)));
+                .statusCode(expectedStatus);
     }
 
-    @Test(groups = {"Regression"}, description = "POST /booking with checkout before checkin returns error or is rejected")
-    public void createWithCheckoutBeforeCheckin_returnsError() {
-        Booking payload = new Booking("Reverse", "Dates", 100, true,
-                new BookingDates("2025-12-10", "2025-12-01"), "None");
+    // -----------------------------------------------------------------------
+    // NEGATIVE — ExistingDefect: wrong types / missing sub-fields (DataProvider)
+    // -----------------------------------------------------------------------
 
-        bookingClient.createBookingRaw(payload)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
+    @DataProvider(name = "existingDefectData")
+    public Object[][] existingDefectData() {
+        return TestDataProvider.toDefectDataProvider(DATA, "negativeExistingDefects");
+    }
+
+    @Test(groups = {"Regression", "ExistingDefect"}, dataProvider = "existingDefectData",
+          description = "DEFECT: POST /booking with invalid data accepted or crashes — assert fails on buggy status")
+    public void createWithDefectiveValidation_failsOnBuggyStatus(String testName, Map<String, Object> body,
+                                                                  int buggyStatus, int expectedStatus, String description) {
+        int actual = bookingClient.createBookingRaw(body).statusCode();
+        Assert.assertFalse(actual == buggyStatus,
+                description + " | Expected: " + expectedStatus + " (correct), Actual: " + actual);
     }
 
     // -----------------------------------------------------------------------
@@ -152,366 +153,55 @@ public class CreateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "POST /booking with same checkin and checkout date is handled gracefully")
     public void createWithSameDates_isHandledGracefully() {
-        Booking payload = new Booking("Same", "Dates", 100, true,
-                new BookingDates("2025-12-01", "2025-12-01"), "None");
+        Booking payload = TestDataProvider.getAs(DATA.path("boundary"), "sameDates", Booking.class);
 
         bookingClient.createBookingRaw(payload)
                 .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
+                .statusCode(HttpStatus.OK);
     }
 
     @Test(groups = {"Regression"}, description = "POST /booking with maximum integer price does not crash server")
     public void createWithMaxIntPrice_doesNotCrash() {
-        Booking payload = new Booking("Max", "Price", Integer.MAX_VALUE, true,
-                new BookingDates("2025-01-01", "2025-01-02"), "None");
+        Booking payload = TestDataProvider.getAs(DATA.path("boundary"), "maxIntPrice", Booking.class);
 
         bookingClient.createBookingRaw(payload)
                 .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
+                .statusCode(HttpStatus.OK);
     }
 
     // -----------------------------------------------------------------------
-    // SECURITY — script / SQL injection in body fields
+    // SECURITY — script / SQL injection in body fields (DataProvider)
     // -----------------------------------------------------------------------
 
-    @Test(groups = {"Regression"}, description = "Script injection in firstname is stored as plain text, not executed")
-    public void createWithXssInFirstname_storedAsPlainText() {
-        Booking payload = new Booking("<script>alert('xss')</script>", "Safe", 100, true,
-                new BookingDates("2025-01-01", "2025-01-05"), "None");
-
-        bookingClient.createBookingRaw(payload)
-                .then()
-                .statusCode(anyOf(is(200), is(400)));
+    @DataProvider(name = "securityData")
+    public Object[][] securityData() {
+        return TestDataProvider.toDataProvider(DATA, "security");
     }
 
-    @Test(groups = {"Regression"}, description = "SQL injection pattern in lastname does not cause server error")
-    public void createWithSqlInjectionInLastname_doesNotCrash() {
-        Booking payload = new Booking("SQL", "'; DROP TABLE bookings; --", 100, false,
-                new BookingDates("2025-01-01", "2025-01-05"), "None");
-
-        bookingClient.createBookingRaw(payload)
+    @Test(groups = {"Regression"}, dataProvider = "securityData",
+          description = "POST /booking with injection payload is handled safely")
+    public void createWithInjection_handledSafely(String testName, Map<String, Object> body,
+                                                   int expectedStatus, String description) {
+        bookingClient.createBookingRaw(body)
                 .then()
-                .statusCode(anyOf(is(200), is(400), is(500)));
-    }
-
-    @Test(groups = {"Regression"}, description = "JSON injection attempt in additionalneeds does not break the response structure")
-    public void createWithJsonInjectionInNotes_doesNotBreakResponse() {
-        Booking payload = new Booking("Json", "Inject", 100, true,
-                new BookingDates("2025-01-01", "2025-01-05"), "\"},\"admin\":true,\"x\":\"");
-
-        bookingClient.createBookingRaw(payload)
-                .then()
-                .statusCode(anyOf(is(200), is(400)));
-    }
-
-    @Test(groups = {"Regression"}, description = "Null byte injection in firstname does not crash server")
-    public void createWithNullByteInFirstname_doesNotCrash() {
-        Booking payload = new Booking("First\u0000Name", "Last", 100, true,
-                new BookingDates("2025-01-01", "2025-01-05"), "None");
-
-        bookingClient.createBookingRaw(payload)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(500)));
+                .statusCode(expectedStatus);
     }
 
     // -----------------------------------------------------------------------
-    // NEGATIVE — Missing individual required fields
+    // DATE FORMAT VARIATIONS (DataProvider)
     // -----------------------------------------------------------------------
 
-    @Test(groups = {"Regression"}, description = "POST /booking without firstname field is rejected")
-    public void createWithoutFirstname_returnsError() {
-        Map<String, Object> body = Map.of(
-                "lastname",     "User",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(400), is(418), is(500)));
+    @DataProvider(name = "dateFormatData")
+    public Object[][] dateFormatData() {
+        return TestDataProvider.toDataProvider(DATA, "dateFormats");
     }
 
-    @Test(groups = {"Regression"}, description = "POST /booking without lastname field is rejected")
-    public void createWithoutLastname_returnsError() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "User",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
+    @Test(groups = {"Regression"}, dataProvider = "dateFormatData",
+          description = "POST /booking with various date formats is accepted")
+    public void createWithVariousDateFormats_isAccepted(String testName, Map<String, Object> body,
+                                                        int expectedStatus, String description) {
         bookingClient.createBookingRaw(body)
                 .then()
-                .statusCode(anyOf(is(400), is(418), is(500)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking without totalprice field is rejected")
-    public void createWithoutTotalPrice_returnsError() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "No",
-                "lastname",     "Price",
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(400), is(418), is(500)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking without depositpaid field is rejected")
-    public void createWithoutDepositPaid_returnsError() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "No",
-                "lastname",     "Deposit",
-                "totalprice",   100,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(400), is(418), is(500)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with bookingdates missing checkin sub-field causes server crash — API only validates that bookingdates key exists, not its required sub-fields")
-    public void createWithMissingCheckin_serverCrashes() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "No",
-                "lastname",     "Checkin",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(418), is(422), is(500)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with bookingdates missing checkout sub-field causes server crash — API only validates that bookingdates key exists, not its required sub-fields")
-    public void createWithMissingCheckout_serverCrashes() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "No",
-                "lastname",     "Checkout",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(418), is(422), is(500)));
-    }
-
-    // -----------------------------------------------------------------------
-    // NEGATIVE — Wrong data types / potential defects
-    // -----------------------------------------------------------------------
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with totalprice as non-numeric string is accepted with 200 — API has no type enforcement on numeric fields")
-    public void createWithNonNumericPrice_acceptedWithoutValidation() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Type",
-                "lastname",     "Check",
-                "totalprice",   "not-a-number",
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with totalprice as decimal float (99.99) is accepted with 200 — integer field silently accepts floating-point values")
-    public void createWithDecimalPrice_acceptedOnIntegerField() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Float",
-                "lastname",     "Price",
-                "totalprice",   99.99,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with depositpaid as string 'true' (not boolean) is accepted with 200 — API has no type enforcement on boolean fields")
-    public void createWithDepositAsBoolString_acceptedWithoutValidation() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Bool",
-                "lastname",     "AsString",
-                "totalprice",   100,
-                "depositpaid",  "true",
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with depositpaid as integer 1 (not boolean) is accepted with 200 — API has no type enforcement on boolean fields")
-    public void createWithDepositAsInteger_acceptedWithoutValidation() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Deposit",
-                "lastname",     "AsInt",
-                "totalprice",   100,
-                "depositpaid",  1,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with bookingdates as a flat string (wrong type) causes server crash — returns 500 Internal Server Error instead of 400 Bad Request")
-    public void createWithDatesAsString_serverCrashes() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Dates",
-                "lastname",     "AsString",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", "2025-01-01"
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(418), is(422), is(500)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with firstname as JSON null causes server crash — null bypasses the JS typeof undefined check (typeof null === 'object') and returns 500")
-    public void createWithNullFirstname_serverCrashes() {
-        Map<String, Object> body = new HashMap<>();
-        body.put("firstname",    null);
-        body.put("lastname",     "Null");
-        body.put("totalprice",   100);
-        body.put("depositpaid",  true);
-        body.put("bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05"));
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(418), is(422), is(500)));
-    }
-
-    @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: POST /booking with empty string firstname is accepted with 200 — API has no minimum-length validation on name fields")
-    public void createWithEmptyFirstname_acceptedWithoutValidation() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "",
-                "lastname",     "EmptyFirst",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01", "checkout", "2025-01-05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(418), is(422)));
-    }
-
-    // -----------------------------------------------------------------------
-    // DATE FORMAT VARIATIONS
-    // -----------------------------------------------------------------------
-
-    @Test(groups = {"Regression"}, description = "POST /booking with ISO-8601 datetime string (with time component) for dates")
-    public void createWithIso8601DateTimeFormat_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Iso",
-                "lastname",     "DateTime",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025-01-01T14:00:00Z", "checkout", "2025-01-05T12:00:00Z")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with slash-separated date format YYYY/MM/DD")
-    public void createWithSlashSeparatedDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Slash",
-                "lastname",     "Date",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2025/01/01", "checkout", "2025/01/05")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with DD-MM-YYYY date format")
-    public void createWithDdMmYyyyDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Ddmm",
-                "lastname",     "Date",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "01-01-2025", "checkout", "05-01-2025")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with MM/DD/YYYY date format")
-    public void createWithMmDdYyyyDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "MmDd",
-                "lastname",     "Format",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "01/01/2025", "checkout", "01/05/2025")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with written-out month date format (e.g. January 01, 2025)")
-    public void createWithLongFormMonthDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Month",
-                "lastname",     "Name",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "January 01, 2025", "checkout", "January 05, 2025")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with Unix timestamp string as date value")
-    public void createWithUnixTimestampDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Unix",
-                "lastname",     "Timestamp",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "1735689600", "checkout", "1736035200")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with far-future dates (year 2099) is handled gracefully")
-    public void createWithFarFutureDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Far",
-                "lastname",     "Future",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "2099-12-30", "checkout", "2099-12-31")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
-    }
-
-    @Test(groups = {"Regression"}, description = "POST /booking with historical past dates (year 1900) is handled gracefully")
-    public void createWithHistoricalDates_isAccepted() {
-        Map<String, Object> body = Map.of(
-                "firstname",    "Historical",
-                "lastname",     "Date",
-                "totalprice",   100,
-                "depositpaid",  true,
-                "bookingdates", Map.of("checkin", "1900-01-01", "checkout", "1900-01-02")
-        );
-        bookingClient.createBookingRaw(body)
-                .then()
-                .statusCode(anyOf(is(200), is(400), is(422)));
+                .statusCode(expectedStatus);
     }
 }

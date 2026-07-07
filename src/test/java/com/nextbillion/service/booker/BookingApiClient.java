@@ -1,8 +1,10 @@
 package com.nextbillion.service.booker;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.nextbillion.core.ApiClient;
+import com.nextbillion.core.HttpStatus;
+import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.model.Booking;
-import com.nextbillion.service.booker.model.BookingDates;
 import com.nextbillion.service.booker.model.BookingResponse;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
@@ -23,8 +25,13 @@ public class BookingApiClient extends ApiClient {
     private static final String AUTH_PATH    = "/auth";
     private static final String BOOKING_PATH = "/booking";
 
-    public BookingApiClient(RequestSpecification requestSpec) {
+    private final String adminUsername;
+    private final String adminPassword;
+
+    public BookingApiClient(RequestSpecification requestSpec, String adminUsername, String adminPassword) {
         super(requestSpec);
+        this.adminUsername = adminUsername;
+        this.adminPassword = adminPassword;
     }
 
     // ------------------------------------------------------------------
@@ -41,12 +48,16 @@ public class BookingApiClient extends ApiClient {
 
     public Response createToken(String username, String password) {
         Map<String, String> body = Map.of("username", username, "password", password);
-        return authenticate(AUTH_PATH, body);
+        return post(AUTH_PATH, body);
+    }
+
+    public Response createTokenRaw(Object body) {
+        return post(AUTH_PATH, body);
     }
 
     public String getValidToken() {
-        return createToken("admin", "password123")
-                .then().statusCode(200).extract().path("token");
+        return createToken(adminUsername, adminPassword)
+                .then().statusCode(HttpStatus.OK).extract().path("token");
     }
 
     // ------------------------------------------------------------------
@@ -114,8 +125,8 @@ public class BookingApiClient extends ApiClient {
     }
 
     public int createDefaultBooking() {
-        Booking b = new Booking("Setup", "Helper", 100, true,
-                new BookingDates("2025-01-01", "2025-01-05"), "None");
+        JsonNode defaultData = TestDataProvider.loadTree("default-booking.json");
+        Booking b = TestDataProvider.getAs(defaultData, Booking.class);
         return createAndGetId(b);
     }
 }

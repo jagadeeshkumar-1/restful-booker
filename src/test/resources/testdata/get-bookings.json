@@ -1,0 +1,29 @@
+{
+  "roundTrip": {
+    "firstname": "RoundTrip",
+    "lastname": "User",
+    "totalprice": 375,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-05-01", "checkout": "2025-05-10" },
+    "additionalneeds": "Breakfast"
+  },
+  "checkoutFilter": {
+    "firstname": "CheckoutFilter",
+    "lastname": "Test",
+    "totalprice": 75,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2032-01-01", "checkout": "2032-01-07" },
+    "additionalneeds": "None"
+  },
+  "checkinFilter": {
+    "firstname": "CheckinFilter",
+    "lastname": "Test",
+    "totalprice": 50,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2031-01-01", "checkout": "2031-01-07" },
+    "additionalneeds": "Pool"
+  },
+  "securityXssFilter": "<script>alert(1)</script>",
+  "securitySqlFilter": "' OR 1=1--",
+  "unknownFilterName": "ZZZGhostXXX"
+}

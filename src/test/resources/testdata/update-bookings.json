@@ -1,0 +1,96 @@
+{
+  "putFullReplace": {
+    "firstname": "Charlie",
+    "lastname": "Brown",
+    "totalprice": 500,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-08-01", "checkout": "2025-08-10" },
+    "additionalneeds": "Dinner"
+  },
+  "putPersistCheck": {
+    "firstname": "Persist",
+    "lastname": "Check",
+    "totalprice": 999,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2026-01-01", "checkout": "2026-01-10" },
+    "additionalneeds": "Gym"
+  },
+  "patchOriginal": {
+    "firstname": "Diana",
+    "lastname": "Prince",
+    "totalprice": 300,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2025-09-01", "checkout": "2025-09-05" },
+    "additionalneeds": "Spa"
+  },
+  "patchFields": {
+    "firstname": "Diana-Updated",
+    "totalprice": 999
+  },
+  "patchLastnameOnly": {
+    "lastname": "PatchedLast"
+  },
+  "putNoAuth": {
+    "firstname": "Hacker",
+    "lastname": "Attempt",
+    "totalprice": 1,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-02" },
+    "additionalneeds": "None"
+  },
+  "putBadToken": {
+    "firstname": "Bad",
+    "lastname": "Token",
+    "totalprice": 1,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-02" },
+    "additionalneeds": "None"
+  },
+  "putNonExistent": {
+    "firstname": "Ghost",
+    "lastname": "Booking",
+    "totalprice": 100,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-02" },
+    "additionalneeds": "None"
+  },
+  "putZeroPrice": {
+    "firstname": "Zero",
+    "lastname": "Price",
+    "totalprice": 0,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+    "additionalneeds": "None"
+  },
+  "securityXssPut": {
+    "firstname": "<script>alert('xss')</script>",
+    "lastname": "Safe",
+    "totalprice": 100,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+    "additionalneeds": "None"
+  },
+  "securitySqlPut": {
+    "firstname": "SQL",
+    "lastname": "' OR '1'='1'; DROP TABLE bookings; --",
+    "totalprice": 100,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+    "additionalneeds": "None"
+  },
+  "securityXssPatch": {
+    "firstname": "<img src=x onerror=alert(1)>"
+  },
+  "securityJsonPatch": {
+    "additionalneeds": "\"},\"admin\":true,\"x\":\""
+  },
+  "patchUnauthorized": {
+    "firstname": "Unauthorized"
+  },
+  "patchBadActor": {
+    "firstname": "BadActor"
+  },
+  "patchNonExistent": {
+    "firstname": "Ghost"
+  }
+}

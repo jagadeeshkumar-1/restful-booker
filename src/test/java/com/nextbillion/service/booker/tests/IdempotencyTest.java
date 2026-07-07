@@ -1,9 +1,12 @@
 package com.nextbillion.service.booker.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nextbillion.core.HttpStatus;
+import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.BookerBaseTest;
 import com.nextbillion.service.booker.model.Booking;
-import com.nextbillion.service.booker.model.BookingDates;
 import com.nextbillion.service.booker.model.BookingResponse;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -28,8 +31,11 @@ import static org.hamcrest.Matchers.*;
  *   DELETE → partially testable; the API has a known defect (returns 405 on second DELETE instead of 404),
  *            which is documented below as ExistingDefect.
  *   POST  → testable in the negative — two identical POSTs must produce two different booking IDs.
+ * All test data is loaded from {@code src/test/resources/testdata/idempotency.json}.
  */
 public class IdempotencyTest extends BookerBaseTest {
+
+    private static final JsonNode DATA = TestDataProvider.loadTree("idempotency.json");
 
     // -----------------------------------------------------------------------
     // GET — safe and idempotent
@@ -65,8 +71,7 @@ public class IdempotencyTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id = bookingClient.createDefaultBooking();
 
-        Booking payload = new Booking("Idempotent", "Put", 200, true,
-                new BookingDates("2025-03-01", "2025-03-05"), "None");
+        Booking payload = TestDataProvider.getAs(DATA, "putPayload", Booking.class);
 
         String firstResponse = bookingClient.updateBooking(id, payload, token)
                 .then()
@@ -90,8 +95,7 @@ public class IdempotencyTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id = bookingClient.createDefaultBooking();
 
-        Booking payload = new Booking("Stable", "State", 500, false,
-                new BookingDates("2025-04-01", "2025-04-10"), "Gym");
+        Booking payload = TestDataProvider.getAs(DATA, "putStatePayload", Booking.class);
 
         bookingClient.updateBooking(id, payload, token).then().statusCode(200);
         bookingClient.updateBooking(id, payload, token).then().statusCode(200);
@@ -99,9 +103,9 @@ public class IdempotencyTest extends BookerBaseTest {
         bookingClient.getBookingById(id)
                 .then()
                 .statusCode(200)
-                .body("firstname",  equalTo("Stable"))
-                .body("lastname",   equalTo("State"))
-                .body("totalprice", equalTo(500));
+                .body("firstname",  equalTo(payload.getFirstname()))
+                .body("lastname",   equalTo(payload.getLastname()))
+                .body("totalprice", equalTo(payload.getTotalprice()));
     }
 
     // -----------------------------------------------------------------------
@@ -113,16 +117,18 @@ public class IdempotencyTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.partialUpdateBooking(id, Map.of("firstname", "FixedPatch"), token)
+        Map<String, Object> patch = TestDataProvider.getAsMap(DATA, "patchField");
+
+        bookingClient.partialUpdateBooking(id, patch, token)
                 .then().statusCode(200);
 
-        bookingClient.partialUpdateBooking(id, Map.of("firstname", "FixedPatch"), token)
+        bookingClient.partialUpdateBooking(id, patch, token)
                 .then().statusCode(200);
 
         bookingClient.getBookingById(id)
                 .then()
                 .statusCode(200)
-                .body("firstname", equalTo("FixedPatch"));
+                .body("firstname", equalTo(patch.get("firstname")));
     }
 
     // -----------------------------------------------------------------------
@@ -136,11 +142,11 @@ public class IdempotencyTest extends BookerBaseTest {
 
         bookingClient.deleteBooking(id, token)
                 .then()
-                .statusCode(201);
+                .statusCode(HttpStatus.CREATED);
 
-        bookingClient.deleteBooking(id, token)
-                .then()
-                .statusCode(405);
+        int actual = bookingClient.deleteBooking(id, token).statusCode();
+        Assert.assertFalse(actual == HttpStatus.METHOD_NOT_ALLOWED,
+                "Expected: " + HttpStatus.NOT_FOUND + " (Not Found), Actual: " + actual);
     }
 
     // -----------------------------------------------------------------------
@@ -149,8 +155,7 @@ public class IdempotencyTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "POST /booking called twice with identical payload creates two distinct resources with different IDs — confirms POST is non-idempotent by design")
     public void post_samePayloadTwice_createsTwoDistinctBookings() {
-        Booking payload = new Booking("Twin", "Booking", 100, true,
-                new BookingDates("2025-05-01", "2025-05-05"), "None");
+        Booking payload = TestDataProvider.getAs(DATA, "postDuplicatePayload", Booking.class);
 
         BookingResponse first  = bookingClient.createBooking(payload);
         BookingResponse second = bookingClient.createBooking(payload);

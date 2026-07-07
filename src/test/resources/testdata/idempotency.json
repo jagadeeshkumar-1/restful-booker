@@ -1,0 +1,29 @@
+{
+  "putPayload": {
+    "firstname": "Idempotent",
+    "lastname": "Put",
+    "totalprice": 200,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-03-01", "checkout": "2025-03-05" },
+    "additionalneeds": "None"
+  },
+  "putStatePayload": {
+    "firstname": "Stable",
+    "lastname": "State",
+    "totalprice": 500,
+    "depositpaid": false,
+    "bookingdates": { "checkin": "2025-04-01", "checkout": "2025-04-10" },
+    "additionalneeds": "Gym"
+  },
+  "patchField": {
+    "firstname": "FixedPatch"
+  },
+  "postDuplicatePayload": {
+    "firstname": "Twin",
+    "lastname": "Booking",
+    "totalprice": 100,
+    "depositpaid": true,
+    "bookingdates": { "checkin": "2025-05-01", "checkout": "2025-05-05" },
+    "additionalneeds": "None"
+  }
+}
