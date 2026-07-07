@@ -47,14 +47,14 @@ public class IdempotencyTest extends BookerBaseTest {
 
         String firstResponse = bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .body()
                 .asString();
 
         String secondResponse = bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .body()
                 .asString();
@@ -68,21 +68,21 @@ public class IdempotencyTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PUT /booking/{id} with same payload applied twice returns identical response bodies — confirms PUT idempotency")
     public void put_samePayloadTwice_returnsSameResponse() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id = bookingClient.createDefaultBooking();
 
         Booking payload = TestDataProvider.getAs(DATA, "putPayload", Booking.class);
 
         String firstResponse = bookingClient.updateBooking(id, payload, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .body()
                 .asString();
 
         String secondResponse = bookingClient.updateBooking(id, payload, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .body()
                 .asString();
@@ -92,17 +92,17 @@ public class IdempotencyTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "GET after two identical PUTs reflects same state — server-side resource is idempotent")
     public void put_samePayloadTwice_serverStateUnchanged() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id = bookingClient.createDefaultBooking();
 
         Booking payload = TestDataProvider.getAs(DATA, "putStatePayload", Booking.class);
 
-        bookingClient.updateBooking(id, payload, token).then().statusCode(200);
-        bookingClient.updateBooking(id, payload, token).then().statusCode(200);
+        bookingClient.updateBooking(id, payload, token).then().statusCode(HttpStatus.OK);
+        bookingClient.updateBooking(id, payload, token).then().statusCode(HttpStatus.OK);
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",  equalTo(payload.getFirstname()))
                 .body("lastname",   equalTo(payload.getLastname()))
                 .body("totalprice", equalTo(payload.getTotalprice()));
@@ -114,20 +114,20 @@ public class IdempotencyTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PATCH /booking/{id} with same fixed field value applied twice leaves booking in the same state — confirms idempotency for non-incremental patches")
     public void patch_fixedValueTwice_serverStateUnchanged() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id = bookingClient.createDefaultBooking();
 
         Map<String, Object> patch = TestDataProvider.getAsMap(DATA, "patchField");
 
         bookingClient.partialUpdateBooking(id, patch, token)
-                .then().statusCode(200);
+                .then().statusCode(HttpStatus.OK);
 
         bookingClient.partialUpdateBooking(id, patch, token)
-                .then().statusCode(200);
+                .then().statusCode(HttpStatus.OK);
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname", equalTo(patch.get("firstname")));
     }
 
@@ -137,7 +137,7 @@ public class IdempotencyTest extends BookerBaseTest {
 
     @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: DELETE /booking/{id} is not idempotent — first call returns 201, second call returns 405 Method Not Allowed instead of 404 Not Found. RFC 7231 requires idempotent DELETE behaviour.")
     public void delete_calledTwice_secondCallReturns405InsteadOf404() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id = bookingClient.createDefaultBooking();
 
         bookingClient.deleteBooking(id, token)

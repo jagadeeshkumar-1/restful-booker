@@ -53,7 +53,7 @@ public class CreateBookingsTest extends BookerBaseTest {
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",             equalTo(payload.getFirstname()))
                 .body("lastname",              equalTo(payload.getLastname()))
                 .body("totalprice",            equalTo(payload.getTotalprice()))

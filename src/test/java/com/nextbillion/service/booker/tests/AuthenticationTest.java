@@ -30,7 +30,8 @@ public class AuthenticationTest extends BookerBaseTest {
     public void validCredentials_returnsToken() {
         bookingClient.createToken(adminUsername, adminPassword)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("token", notNullValue())
                 .body("token", not(emptyString()))
                 .body("token.length()", greaterThan(5));
@@ -113,7 +114,7 @@ public class AuthenticationTest extends BookerBaseTest {
         JsonNode boundary = DATA.path("boundary").path("singleChar");
         bookingClient.createToken(boundary.path("username").asText(), boundary.path("password").asText())
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("reason", equalTo("Bad credentials"));
     }
 
@@ -153,7 +154,7 @@ public class AuthenticationTest extends BookerBaseTest {
                                                       String password, String description) {
         bookingClient.createToken(username, password)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("reason", equalTo("Bad credentials"))
                 .body("token", nullValue());
     }
