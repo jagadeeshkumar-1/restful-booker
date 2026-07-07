@@ -71,10 +71,12 @@ NextBillionAssignment/
         │       ├── base/
         │       │   └── BaseTest.java                # Abstract base — Rest Assured config, request spec
         │       ├── core/
-        │       │   └── ApiClient.java               # Generic HTTP methods (GET, POST, PUT, PATCH, DELETE)
+        │       │   ├── ApiClient.java               # Generic HTTP methods (GET, POST, PUT, PATCH, DELETE)
+        │       │   ├── HttpStatus.java              # HTTP status code constants (200, 400, 404, etc.)
+        │       │   └── TestDataProvider.java         # Loads JSON test data, provides TestNG @DataProvider helpers
         │       └── service/
         │           └── booker/
-        │               ├── BookerBaseTest.java       # Booker-specific setup (base URI, client init)
+        │               ├── BookerBaseTest.java       # Booker-specific setup (base URI, credentials, client init)
         │               ├── BookingApiClient.java     # All Booker API calls (create, get, update, delete, auth)
         │               ├── model/
         │               │   ├── Booking.java          # Request/response POJO for booking body
@@ -82,15 +84,24 @@ NextBillionAssignment/
         │               │   └── BookingResponse.java  # POJO for POST /booking response (id + booking)
         │               └── tests/
         │                   ├── BookingLifecycleTest.java  # E2E: POST→GET→PUT→PATCH→DELETE — 1 test
-        │                   ├── AuthenticationTest.java    # POST /auth — 12 tests
-        │                   ├── CreateBookingsTest.java    # POST /booking — 37 tests
+        │                   ├── AuthenticationTest.java    # POST /auth — 12 tests (DataProvider-driven)
+        │                   ├── CreateBookingsTest.java    # POST /booking — 37 tests (DataProvider-driven)
         │                   ├── GetBookingByIdTest.java    # GET /booking & GET /booking/{id} — 13 tests
         │                   ├── UpdateBookingsTest.java    # PUT & PATCH /booking/{id} — 16 tests
         │                   ├── DeleteBookingsTest.java    # DELETE /booking/{id} — 13 tests
         │                   └── IdempotencyTest.java       # Idempotency for all CRUD ops — 6 tests
         └── resources/
-            ├── config.properties                    # Default base URI setting
-            └── testng.xml                           # Test suite definition with parallel execution
+            ├── config.properties                    # Base URI + admin credentials (overridable)
+            ├── testng.xml                           # Test suite definition with parallel execution
+            └── testdata/                            # External JSON test data files
+                ├── authentication.json              # Auth test data (credentials, boundary, security)
+                ├── booking-lifecycle.json            # Lifecycle test data (original, update, patch)
+                ├── create-bookings.json             # Create booking data (positive, negative, defects)
+                ├── default-booking.json             # Default booking for setup helpers
+                ├── delete-bookings.json             # Delete test data (tokens, IDs)
+                ├── get-bookings.json                # GET test data (filters, security strings)
+                ├── idempotency.json                 # Idempotency test payloads
+                └── update-bookings.json             # PUT/PATCH test data
 ```
 
 ---
@@ -116,9 +127,21 @@ Extends `BaseTest`. Resolves the Booker base URI from (in priority order):
 Instantiates `BookingApiClient` in `@BeforeSuite`, then immediately calls `GET /ping`. If the API responds with anything other than HTTP 201, the suite aborts immediately with a clear `[HealthCheck] FAILED` message — preventing 95 misleading failures when the API is simply unreachable.
 
 **3. `ApiClient`**
-Generic HTTP client with methods for `get()`, `post()`, `put()`, `patch()`, `delete()`. Uses Jackson's `ObjectMapper` to explicitly serialize all request bodies to JSON strings before sending — this ensures consistent wire serialization regardless of the Rest Assured version.
+Generic HTTP client with methods for `get()`, `post()`, `put()`, `patch()`, `delete()`. Passes request bodies directly to Rest Assured's `.body()` method — Rest Assured serializes them via the Jackson 2 object mapper configured in `BaseTest.initSuite()`. No manual serialization needed.
 
-**4. `BookingApiClient`**
+**4. `HttpStatus`**
+Constants class for HTTP status codes (`OK`, `CREATED`, `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`). Eliminates magic numbers across all test assertions.
+
+**5. `TestDataProvider`**
+Utility class that loads test data from JSON files under `src/test/resources/testdata/`. Provides:
+- `loadTree(fileName)` — loads a JSON file and returns the root `JsonNode`
+- `getAs(node, fieldName, Class)` — deserializes a named child node into a POJO
+- `getAsMap(node, fieldName)` — deserializes a child node into a `Map<String, Object>`
+- `toDataProvider(node, arrayField)` — converts a JSON array into a TestNG `Object[][]` DataProvider
+- `toDefectDataProvider(node, arrayField)` — same as above but includes `buggyStatus` for ExistingDefect tests
+- `getString()` / `getInt()` — scalar value accessors
+
+**6. `BookingApiClient`**
 Booker-specific API client. Wraps `ApiClient` with domain-specific methods:
 - `createBooking(Booking)` — POST and deserialize response to `BookingResponse`
 - `createBookingRaw(Object)` — POST and return raw `Response` (used for negative tests)
@@ -129,10 +152,12 @@ Booker-specific API client. Wraps `ApiClient` with domain-specific methods:
 - `deleteBooking(id, token)` — DELETE with Cookie auth
 - `ping()` — GET /ping (health check)
 - `createToken(username, password)` — POST /auth
+- `createTokenRaw(Object)` — POST /auth with arbitrary body (for negative tests with missing fields)
 - `getValidToken()` — cached token helper
-- `createDefaultBooking()` / `createAndGetId()` — setup helpers for tests
+- `createDefaultBooking()` — loads default booking from `default-booking.json`
+- `createAndGetId()` — setup helper that returns only the booking ID
 
-**5. Model Classes (`Booking`, `BookingDates`, `BookingResponse`)**
+**7. Model Classes (`Booking`, `BookingDates`, `BookingResponse`)**
 Plain Java POJOs annotated with Lombok `@Data`, `@NoArgsConstructor`, and `@AllArgsConstructor`. Lombok generates all getters, setters, `equals`, `hashCode`, and `toString` at compile time — no boilerplate needed. Field names exactly match the API's JSON keys so no `@JsonProperty` annotations are required.
 
 ---
@@ -141,12 +166,23 @@ Plain Java POJOs annotated with Lombok `@Data`, `@NoArgsConstructor`, and `@AllA
 
 The base URI is resolved automatically. You do not need to edit any file to run the suite.
 
+**Base URI:**
+
 | Source | How to Set |
 |--------|-----------|
 | System property | `mvn test -Dbooker.base.uri=https://restful-booker.herokuapp.com` |
 | Environment variable | `export BOOKER_BASE_URI=https://restful-booker.herokuapp.com` |
 | config.properties | Edit `src/test/resources/config.properties` |
 | Default fallback | Already set to `https://restful-booker.herokuapp.com` |
+
+**Admin Credentials** (used for auth token generation):
+
+| Source | How to Set |
+|--------|-----------|
+| System property | `mvn test -Dbooker.admin.username=admin -Dbooker.admin.password=password123` |
+| Environment variable | `export BOOKER_ADMIN_USERNAME=admin && export BOOKER_ADMIN_PASSWORD=password123` |
+| config.properties | Edit `booker.admin.username` and `booker.admin.password` in `config.properties` |
+| Default fallback | `admin` / `password123` |
 
 ---
 
@@ -203,24 +239,22 @@ Every test method is tagged with one or more of the following TestNG groups:
 
 ### Authentication (`AuthenticationTest` — 12 tests)
 
+All test data loaded from `testdata/authentication.json`. Negative and security tests use `@DataProvider`.
+
 | Test | Groups | What It Verifies |
 |------|--------|-----------------|
 | `validCredentials_returnsToken` | **Smoke**, Regression | Valid admin credentials return a non-empty token |
-| `wrongPassword_returnsBadCredentials` | Regression, **ExistingDefect** | Wrong password → 200 + "Bad credentials" (defect: should be 401) |
-| `wrongUsername_returnsBadCredentials` | Regression, **ExistingDefect** | Wrong username → 200 + "Bad credentials" (defect: should be 401) |
-| `bothWrongCredentials_returnsBadCredentials` | Regression, **ExistingDefect** | Both wrong → 200 + "Bad credentials" (defect: should be 401) |
-| `missingPassword_returnsBadCredentials` | Regression, **ExistingDefect** | Missing password field → 200 + "Bad credentials" (defect: should be 400) |
-| `missingUsername_returnsBadCredentials` | Regression, **ExistingDefect** | Missing username field → 200 + "Bad credentials" (defect: should be 400) |
-| `emptyBody_returnsBadCredentials` | Regression, **ExistingDefect** | Empty body → 200 + "Bad credentials" (defect: should be 400) |
+| `invalidCredentials_failsOnBuggyStatus` (×3) | Regression, **ExistingDefect** | DataProvider-driven: wrong password / wrong username / both wrong → 200 (defect: should be 401) |
+| `missingAuthFields_failsOnBuggyStatus` (×3) | Regression, **ExistingDefect** | DataProvider-driven: missing password / missing username / empty body → 200 (defect: should be 400) |
 | `singleCharCredentials_returnsBadCredentials` | Regression | Single char credentials → rejected |
 | `veryLongUsername_doesNotCrashServer` | Regression | 1000-char username → no 500 crash |
-| `xssInUsername_noTokenIssued` | Regression | XSS payload in username → no token issued |
-| `sqlInjectionInPassword_noTokenGranted` | Regression | SQL injection in password → no token issued |
-| `jsonInjectionInCredentials_authNotBypassed` | Regression | JSON injection in credentials → no token issued |
+| `injectionInCredentials_noTokenIssued` (×3) | Regression | DataProvider-driven: XSS, SQL injection, JSON injection → no token issued |
 
 ---
 
 ### Create Booking (`CreateBookingsTest` — 37 tests)
+
+All test data loaded from `testdata/create-bookings.json`. Negative, defect, security, and date format tests use `@DataProvider`.
 
 **Positive (5 tests — Smoke + Regression)**
 - Full round-trip: all fields returned correctly in response
@@ -364,10 +398,7 @@ RestAssured.config = RestAssuredConfig.config()
 ```
 controls how Rest Assured **deserializes** response bodies when you call `.extract().as(SomeClass.class)`. Without it, Rest Assured scans the classpath and picks a JSON library in this order: **Jackson 2 → Gson → Jackson 1 → JAXB**. Jackson 2 is your only JSON library right now, so it would be chosen automatically — but if any future dependency pulls in Gson as a transitive library, Rest Assured would silently switch to it, breaking deserialization. This line pins the choice explicitly so the behaviour is immune to classpath changes.
 
-Note: this config is for **deserialization only** (response → Java object). Serialization (Java object → request JSON) is handled separately by `ObjectMapper.writeValueAsString()` in `ApiClient.toJson()`.
-
-### Why explicit Jackson serialization in `ApiClient`?
-Rest Assured's serialization behavior can vary depending on which libraries are on the classpath (it may fall back to Groovy's `JsonOutput`). To guarantee consistent, predictable JSON on the wire, `ApiClient` uses `ObjectMapper.writeValueAsString()` to serialize all request bodies explicitly before passing them to Rest Assured.
+This config controls both **deserialization** (response → Java object via `.extract().as()`) and **serialization** (Java object → request JSON via `.body()`). With Jackson 2 pinned, `ApiClient` passes objects directly to Rest Assured's `.body()` method without any manual serialization — Rest Assured handles it automatically using the configured Jackson 2 mapper.
 
 ### Why `Accept: application/json` (not `ContentType.JSON`)?
 The Restful Booker API returns **HTTP 418 I'm a Teapot** when the `Accept` header contains anything other than plain `application/json`. Rest Assured's `ContentType.JSON` expands to a multi-value header (`application/json, */*`) which the API rejects. Setting the header as a plain string fixes this.
@@ -404,6 +435,18 @@ The two overloads are a deliberate split: **raw access for tests that need contr
 
 ### Why separate `createBookingRaw()` and `createBooking()` methods?
 `createBooking(Booking)` always deserializes the response into a `BookingResponse` object — ideal for positive tests that need to assert on the returned booking ID or field values. `createBookingRaw(Object)` returns the raw `Response` object — ideal for negative tests where the body might not be a valid `BookingResponse` (e.g., error responses or 500 crashes).
+
+### Why externalize test data into JSON files?
+All test data (booking payloads, credentials, security strings, boundary values) lives in JSON files under `src/test/resources/testdata/`. This achieves:
+- **Separation of concerns** — test logic in Java, test data in JSON
+- **Easy maintenance** — adding a new negative test case is a JSON edit, not a code change
+- **Non-developer contributions** — QA team members can add test scenarios without touching Java
+- **No hardcoded data** — zero booking payloads, credentials, or magic strings in any test file
+
+Tests load data via `TestDataProvider.loadTree()` at class initialization and use `@DataProvider` for parameterized test methods (negative, defect, security, and date format tests).
+
+### Why `HttpStatus` constants instead of magic numbers?
+Status codes like `200`, `403`, `404`, `405` appeared dozens of times across all test files. `HttpStatus.OK`, `HttpStatus.FORBIDDEN`, etc. make assertions self-documenting and reduce the risk of typos.
 
 ### Why a dedicated `BookingLifecycleTest`?
 Each unit test class creates its own independent booking — no single existing test exercises the full CRUD chain on one resource. `BookingLifecycleTest` fills this gap: one test, one booking ID, all five operations verified in sequence. It is the primary `Smoke` signal — if it fails, something fundamental is broken.
@@ -872,11 +915,8 @@ This project was developed with AI assistance. Below is a transparent breakdown 
 
 Given more time, these are the improvements I would prioritize:
 
-### 1. Data-Driven Parameterization
-Replace hardcoded test data with TestNG `@DataProvider` backed by external sources (CSV/JSON files). This would:
-- Make it trivial to add new test cases without writing new methods
-- Separate test data from test logic
-- Enable non-developers to contribute test scenarios
+### ~~1. Data-Driven Parameterization~~ ✅ Done
+All test data has been externalized into JSON files under `src/test/resources/testdata/`. TestNG `@DataProvider` is used for parameterized negative, defect, security, and date format tests. New test cases can be added by editing JSON files — no Java changes needed.
 
 ### 2. Retry Logic for Flaky External API
 The Restful Booker demo API occasionally returns intermittent failures (timeouts, 500s). I would add:
