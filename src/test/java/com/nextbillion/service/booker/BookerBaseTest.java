@@ -9,6 +9,8 @@ import org.testng.annotations.BeforeSuite;
  * Extends the generic {@link BaseTest} and adds booker-specific setup:
  *   1. Resolves the booker service URI via booker-specific property keys.
  *   2. Instantiates {@link BookingApiClient} for all booker test classes.
+ *   3. Performs a health check on {@code GET /ping} before any test runs.
+ *   4. Caches an auth token so individual tests do not need to re-authenticate.
  * <p>
  * When a new microservice is added (e.g. Payment), create a sibling class
  * {@code service/payment/PaymentBaseTest} that extends {@link BaseTest},
@@ -16,9 +18,13 @@ import org.testng.annotations.BeforeSuite;
  */
 public class BookerBaseTest extends BaseTest {
 
+    /** Maximum acceptable response time in milliseconds (SLA). */
+    protected static final long RESPONSE_TIME_SLA_MS = 5000L;
+
     protected static BookingApiClient bookingClient;
     protected static String           adminUsername;
     protected static String           adminPassword;
+    protected static String           cachedToken;
 
     @Override
     @BeforeSuite(alwaysRun = true)
@@ -34,7 +40,10 @@ public class BookerBaseTest extends BaseTest {
                 "[HealthCheck] FAILED — " + resolveBaseUri() + "/ping returned HTTP " +
                 pingStatus + " (expected 201). Aborting suite.");
         }
-        System.out.println("[HealthCheck] API is healthy at " + resolveBaseUri());
+        LOG.info("[HealthCheck] API is healthy at {}", resolveBaseUri());
+
+        cachedToken = bookingClient.getValidToken();
+        LOG.info("[Auth] Token cached for suite — {} auth API calls saved", "all per-test");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.nextbillion.service.booker.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nextbillion.core.HttpStatus;
 import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.BookerBaseTest;
 import com.nextbillion.service.booker.model.Booking;
@@ -28,7 +29,7 @@ public class BookingLifecycleTest extends BookerBaseTest {
     @Test(groups = {"Smoke", "Regression"},
           description = "Full lifecycle: POST → GET → PUT → PATCH → DELETE on the same booking ID, verifying response at each step")
     public void fullBookingLifecycle_createGetPutPatchDelete() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
 
         Booking original   = TestDataProvider.getAs(DATA, "original", Booking.class);
         Booking putPayload = TestDataProvider.getAs(DATA, "putUpdate", Booking.class);
@@ -54,7 +55,8 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // ------------------------------------------------------------------
         bookingClient.getBookingById(bookingId)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("firstname",             equalTo(original.getFirstname()))
                 .body("lastname",              equalTo(original.getLastname()))
                 .body("totalprice",            equalTo(original.getTotalprice()))
@@ -68,7 +70,7 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // ------------------------------------------------------------------
         bookingClient.updateBooking(bookingId, putPayload, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",             equalTo(putPayload.getFirstname()))
                 .body("lastname",              equalTo(putPayload.getLastname()))
                 .body("totalprice",            equalTo(putPayload.getTotalprice()))
@@ -80,7 +82,7 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // GET after PUT — verify all fields were replaced and persisted
         bookingClient.getBookingById(bookingId)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",   equalTo(putPayload.getFirstname()))
                 .body("lastname",    equalTo(putPayload.getLastname()))
                 .body("totalprice",  equalTo(putPayload.getTotalprice()))
@@ -94,7 +96,7 @@ public class BookingLifecycleTest extends BookerBaseTest {
 
         bookingClient.partialUpdateBooking(bookingId, patchFields, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",   equalTo(patchedFirstname))          // patched
                 .body("totalprice",  equalTo(patchedPrice))              // patched
                 .body("lastname",    equalTo(putPayload.getLastname()))   // unchanged
@@ -103,7 +105,7 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // GET after PATCH — verify partial update persisted and untouched fields remain
         bookingClient.getBookingById(bookingId)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",  equalTo(patchedFirstname))
                 .body("totalprice", equalTo(patchedPrice))
                 .body("lastname",   equalTo(putPayload.getLastname()));
@@ -113,11 +115,11 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // ------------------------------------------------------------------
         bookingClient.deleteBooking(bookingId, token)
                 .then()
-                .statusCode(201);
+                .statusCode(HttpStatus.CREATED);
 
         // GET after DELETE — booking must no longer exist
         bookingClient.getBookingById(bookingId)
                 .then()
-                .statusCode(404);
+                .statusCode(HttpStatus.NOT_FOUND);
     }
 }

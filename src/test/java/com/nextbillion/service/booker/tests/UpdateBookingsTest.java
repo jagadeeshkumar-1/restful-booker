@@ -28,14 +28,15 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "PUT /booking/{id} fully replaces all fields and response reflects new values")
     public void putWithValidToken_replacesAllFields() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Booking updated = TestDataProvider.getAs(DATA, "putFullReplace", Booking.class);
 
         bookingClient.updateBooking(id, updated, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("firstname",             equalTo(updated.getFirstname()))
                 .body("lastname",              equalTo(updated.getLastname()))
                 .body("totalprice",            equalTo(updated.getTotalprice()))
@@ -47,16 +48,16 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "PUT /booking/{id} change is persisted — verified by subsequent GET")
     public void putChange_persistsOnSubsequentGet() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Booking updated = TestDataProvider.getAs(DATA, "putPersistCheck", Booking.class);
 
-        bookingClient.updateBooking(id, updated, token).then().statusCode(200);
+        bookingClient.updateBooking(id, updated, token).then().statusCode(HttpStatus.OK);
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("firstname",  equalTo(updated.getFirstname()))
                 .body("totalprice", equalTo(updated.getTotalprice()));
     }
@@ -67,7 +68,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "PATCH /booking/{id} updates only supplied fields; untouched fields remain")
     public void patchWithValidToken_updatesOnlySuppliedFields() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         Booking original = TestDataProvider.getAs(DATA, "patchOriginal", Booking.class);
         int id = bookingClient.createAndGetId(original);
 
@@ -75,7 +76,8 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
         bookingClient.partialUpdateBooking(id, patchFields, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("firstname",       equalTo(patchFields.get("firstname")))
                 .body("totalprice",      equalTo(patchFields.get("totalprice")))
                 .body("lastname",        equalTo(original.getLastname()))
@@ -85,17 +87,17 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Smoke", "Regression"}, description = "PATCH /booking/{id}: partial change is persisted — verified by GET")
     public void patchChange_persistsOnSubsequentGet() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Map<String, Object> patchBody = TestDataProvider.getAsMap(DATA, "patchLastnameOnly");
 
         bookingClient.partialUpdateBooking(id, patchBody, token)
-                .then().statusCode(200);
+                .then().statusCode(HttpStatus.OK);
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("lastname", equalTo(patchBody.get("lastname")));
     }
 
@@ -110,7 +112,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
         bookingClient.updateBookingWithoutAuth(id, body)
                 .then()
-                .statusCode(403)
+                .statusCode(HttpStatus.FORBIDDEN)
                 .body(equalTo("Forbidden"));
     }
 
@@ -122,7 +124,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
         bookingClient.partialUpdateWithoutAuth(id, patchBody)
                 .then()
-                .statusCode(403)
+                .statusCode(HttpStatus.FORBIDDEN)
                 .body(equalTo("Forbidden"));
     }
 
@@ -137,7 +139,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
         bookingClient.updateBookingWithBadToken(id, body, "totally-fake-token-xyz")
                 .then()
-                .statusCode(403)
+                .statusCode(HttpStatus.FORBIDDEN)
                 .body(equalTo("Forbidden"));
     }
 
@@ -149,7 +151,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
         bookingClient.partialUpdateWithBadToken(id, patchBody, "fake-token-xyz")
                 .then()
-                .statusCode(403)
+                .statusCode(HttpStatus.FORBIDDEN)
                 .body(equalTo("Forbidden"));
     }
 
@@ -159,7 +161,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: PUT on non-existent booking returns 405 Method Not Allowed — should return 404 Not Found (method IS allowed, the resource does not exist)")
     public void putOnNonExistentId_returns405() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         Booking body = TestDataProvider.getAs(DATA, "putNonExistent", Booking.class);
 
         int actual = bookingClient.updateBooking(999999999, body, token).statusCode();
@@ -169,7 +171,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: PATCH on non-existent booking returns 405 Method Not Allowed — should return 404 Not Found")
     public void patchOnNonExistentId_returns405() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
 
         Map<String, Object> patchBody = TestDataProvider.getAsMap(DATA, "patchNonExistent");
 
@@ -184,20 +186,20 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PUT /booking/{id} with zero totalprice is accepted")
     public void putZeroPrice_isAccepted() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Booking body = TestDataProvider.getAs(DATA, "putZeroPrice", Booking.class);
 
         bookingClient.updateBooking(id, body, token)
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("totalprice", equalTo(0));
     }
 
     @Test(groups = {"Regression"}, description = "PATCH with empty map body returns 400 or 200 — must not crash server")
     public void patchEmptyBody_doesNotCrash() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         bookingClient.partialUpdateBooking(id, Map.of(), token)
@@ -211,7 +213,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PUT: script injection in firstname is stored as text, not executed")
     public void putWithXssInFirstname_storedAsPlainText() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Booking body = TestDataProvider.getAs(DATA, "securityXssPut", Booking.class);
@@ -223,7 +225,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PUT: SQL injection in lastname does not cause a server error")
     public void putWithSqlInjectionInLastname_doesNotCrash() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Booking body = TestDataProvider.getAs(DATA, "securitySqlPut", Booking.class);
@@ -235,7 +237,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PATCH: script injection in firstname field is handled safely")
     public void patchWithXssInFirstname_handledSafely() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Map<String, Object> patchBody = TestDataProvider.getAsMap(DATA, "securityXssPatch");
@@ -247,7 +249,7 @@ public class UpdateBookingsTest extends BookerBaseTest {
 
     @Test(groups = {"Regression"}, description = "PATCH: JSON injection in additionalneeds does not break response structure")
     public void patchWithJsonInjectionInNotes_doesNotBreakResponse() {
-        String token = bookingClient.getValidToken();
+        String token = cachedToken;
         int id       = bookingClient.createDefaultBooking();
 
         Map<String, Object> patchBody = TestDataProvider.getAsMap(DATA, "securityJsonPatch");

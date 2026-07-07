@@ -35,7 +35,8 @@ public class GetBookingByIdTest extends BookerBaseTest {
 
         Booking fetched = bookingClient.getBookingById(created.getBookingid())
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("firstname",             equalTo(payload.getFirstname()))
                 .body("lastname",              equalTo(payload.getLastname()))
                 .body("totalprice",            equalTo(payload.getTotalprice()))
@@ -58,7 +59,8 @@ public class GetBookingByIdTest extends BookerBaseTest {
     public void getAllBookings_returnsNonEmptyList() {
         bookingClient.getAllBookings()
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
+                .time(lessThan(RESPONSE_TIME_SLA_MS))
                 .body("size()", greaterThan(0))
                 .body("bookingid", everyItem(notNullValue()));
     }
@@ -67,7 +69,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
     public void getAllBookings_eachItemHasBookingIdField() {
         bookingClient.getAllBookings()
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("bookingid", everyItem(instanceOf(Integer.class)))
                 .body("bookingid", everyItem(greaterThan(0)));
     }
@@ -91,7 +93,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
 
         var ids = bookingClient.getAllBookings()
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .jsonPath()
                 .getList("bookingid", Integer.class);
@@ -106,7 +108,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
 
         var ids = bookingClient.getBookings(Map.of("checkout", "2032-01-08"))
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .jsonPath()
                 .getList("bookingid", Integer.class);
@@ -126,7 +128,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
 
         var ids = bookingClient.getBookings(Map.of("firstname", first, "lastname", last))
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .jsonPath()
                 .getList("bookingid", Integer.class);
@@ -141,7 +143,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
 
         var ids = bookingClient.getBookings(Map.of("checkin", "2030-12-31"))
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .extract()
                 .jsonPath()
                 .getList("bookingid", Integer.class);
@@ -157,7 +159,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
     public void getNonExistentId_returns404() {
         bookingClient.getBookingById(999999999)
                 .then()
-                .statusCode(404)
+                .statusCode(HttpStatus.NOT_FOUND)
                 .body(equalTo("Not Found"));
     }
 
@@ -166,7 +168,7 @@ public class GetBookingByIdTest extends BookerBaseTest {
         String unknownName = TestDataProvider.getString(DATA, "unknownFilterName");
         bookingClient.getBookings(Map.of("firstname", unknownName, "lastname", unknownName))
                 .then()
-                .statusCode(200)
+                .statusCode(HttpStatus.OK)
                 .body("size()", equalTo(0));
     }
 
