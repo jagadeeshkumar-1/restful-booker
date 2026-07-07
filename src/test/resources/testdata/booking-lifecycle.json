@@ -1,0 +1,28 @@
+{
+  "original": {
+    "firstname": "Alice",
+    "lastname": "Smith",
+    "totalprice": 250,
+    "depositpaid": true,
+    "bookingdates": {
+      "checkin": "2025-06-01",
+      "checkout": "2025-06-07"
+    },
+    "additionalneeds": "Breakfast"
+  },
+  "putUpdate": {
+    "firstname": "Bob",
+    "lastname": "Jones",
+    "totalprice": 500,
+    "depositpaid": false,
+    "bookingdates": {
+      "checkin": "2025-08-01",
+      "checkout": "2025-08-10"
+    },
+    "additionalneeds": "Dinner"
+  },
+  "patchFields": {
+    "firstname": "Charlie",
+    "totalprice": 999
+  }
+}

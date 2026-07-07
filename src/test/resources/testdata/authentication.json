@@ -1,0 +1,75 @@
+{
+  "negativeCredentials": [
+    {
+      "testName": "wrongPassword_returnsBadCredentials",
+      "usernameKey": "ADMIN",
+      "password": "wrongpassword",
+      "buggyStatus": 200,
+      "expectedStatus": 401,
+      "description": "DEFECT: Wrong password returns 200 — should return 401"
+    },
+    {
+      "testName": "wrongUsername_returnsBadCredentials",
+      "username": "notexist",
+      "passwordKey": "ADMIN",
+      "buggyStatus": 200,
+      "expectedStatus": 401,
+      "description": "DEFECT: Wrong username returns 200 — should return 401"
+    },
+    {
+      "testName": "bothWrongCredentials_returnsBadCredentials",
+      "username": "nobody",
+      "password": "nothing",
+      "buggyStatus": 200,
+      "expectedStatus": 401,
+      "description": "DEFECT: Both wrong credentials return 200 — should return 401"
+    }
+  ],
+  "negativeMissingFields": [
+    {
+      "testName": "missingPassword_returnsBadCredentials",
+      "body": { "username": "ADMIN_USERNAME" },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: Missing password field returns 200 — should return 400"
+    },
+    {
+      "testName": "missingUsername_returnsBadCredentials",
+      "body": { "password": "ADMIN_PASSWORD" },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: Missing username field returns 200 — should return 400"
+    },
+    {
+      "testName": "emptyBody_returnsBadCredentials",
+      "body": {},
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: Empty body returns 200 — should return 400"
+    }
+  ],
+  "boundary": {
+    "singleChar": { "username": "a", "password": "b" },
+    "longUsernameRepeat": 1000
+  },
+  "security": [
+    {
+      "testName": "xssInUsername_noTokenIssued",
+      "username": "<script>alert('xss')</script>",
+      "password": "password123",
+      "description": "Script injection in username"
+    },
+    {
+      "testName": "sqlInjectionInPassword_noTokenGranted",
+      "username": "admin",
+      "password": "' OR '1'='1",
+      "description": "SQL injection in password"
+    },
+    {
+      "testName": "jsonInjectionInCredentials_authNotBypassed",
+      "username": "admin\",\"extra\":\"injected",
+      "password": "password123",
+      "description": "JSON injection in credentials"
+    }
+  ]
+}

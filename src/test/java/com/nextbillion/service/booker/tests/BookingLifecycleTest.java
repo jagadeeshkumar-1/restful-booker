@@ -1,8 +1,9 @@
 package com.nextbillion.service.booker.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.BookerBaseTest;
 import com.nextbillion.service.booker.model.Booking;
-import com.nextbillion.service.booker.model.BookingDates;
 import com.nextbillion.service.booker.model.BookingResponse;
 import org.testng.annotations.Test;
 
@@ -18,20 +19,24 @@ import static org.hamcrest.Matchers.*;
  *
  * This is the primary Smoke signal for the Booking API:
  * if any step fails, core API functionality is broken.
+ * All test data is loaded from {@code src/test/resources/testdata/booking-lifecycle.json}.
  */
 public class BookingLifecycleTest extends BookerBaseTest {
+
+    private static final JsonNode DATA = TestDataProvider.loadTree("booking-lifecycle.json");
 
     @Test(groups = {"Smoke", "Regression"},
           description = "Full lifecycle: POST → GET → PUT → PATCH → DELETE on the same booking ID, verifying response at each step")
     public void fullBookingLifecycle_createGetPutPatchDelete() {
         String token = bookingClient.getValidToken();
 
+        Booking original   = TestDataProvider.getAs(DATA, "original", Booking.class);
+        Booking putPayload = TestDataProvider.getAs(DATA, "putUpdate", Booking.class);
+        Map<String, Object> patchFields = TestDataProvider.getAsMap(DATA, "patchFields");
+
         // ------------------------------------------------------------------
         // STEP 1: CREATE — POST /booking
         // ------------------------------------------------------------------
-        Booking original = new Booking("Alice", "Smith", 250, true,
-                new BookingDates("2025-06-01", "2025-06-07"), "Breakfast");
-
         BookingResponse createResponse = bookingClient.createBooking(original);
         int bookingId = createResponse.getBookingid();
 
@@ -61,9 +66,6 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // ------------------------------------------------------------------
         // STEP 3: FULL UPDATE — PUT /booking/{id}
         // ------------------------------------------------------------------
-        Booking putPayload = new Booking("Bob", "Jones", 500, false,
-                new BookingDates("2025-08-01", "2025-08-10"), "Dinner");
-
         bookingClient.updateBooking(bookingId, putPayload, token)
                 .then()
                 .statusCode(200)
@@ -87,11 +89,10 @@ public class BookingLifecycleTest extends BookerBaseTest {
         // ------------------------------------------------------------------
         // STEP 4: PARTIAL UPDATE — PATCH /booking/{id}
         // ------------------------------------------------------------------
-        String patchedFirstname = "Charlie";
-        int    patchedPrice     = 999;
+        String patchedFirstname = (String) patchFields.get("firstname");
+        int    patchedPrice     = (int) patchFields.get("totalprice");
 
-        bookingClient.partialUpdateBooking(bookingId,
-                        Map.of("firstname", patchedFirstname, "totalprice", patchedPrice), token)
+        bookingClient.partialUpdateBooking(bookingId, patchFields, token)
                 .then()
                 .statusCode(200)
                 .body("firstname",   equalTo(patchedFirstname))          // patched

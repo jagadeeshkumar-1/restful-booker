@@ -1,0 +1,9 @@
+{
+  "securityTokens": {
+    "xss": "<script>alert('xss')</script>",
+    "sql": "' OR '1'='1",
+    "fake": "completely-fake-token-xyz",
+    "empty": ""
+  },
+  "nonExistentId": 999999999
+}

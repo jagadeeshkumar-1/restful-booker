@@ -1,6 +1,10 @@
 package com.nextbillion.service.booker.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nextbillion.core.HttpStatus;
+import com.nextbillion.core.TestDataProvider;
 import com.nextbillion.service.booker.BookerBaseTest;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -10,8 +14,13 @@ import static org.hamcrest.Matchers.*;
  * DELETE /booking/{id} tests.
  * Covers: positive (delete + 404 confirmation), negative (no auth, bad token,
  *         non-existent ID, double-delete), boundary, and security cases.
+ * All test data is loaded from {@code src/test/resources/testdata/delete-bookings.json}.
  */
 public class DeleteBookingsTest extends BookerBaseTest {
+
+    private static final JsonNode DATA = TestDataProvider.loadTree("delete-bookings.json");
+    private static final JsonNode TOKENS = DATA.path("securityTokens");
+    private static final int NON_EXISTENT_ID = TestDataProvider.getInt(DATA, "nonExistentId");
 
     // -----------------------------------------------------------------------
     // POSITIVE
@@ -22,9 +31,9 @@ public class DeleteBookingsTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id       = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, token)
-                .then()
-                .statusCode(201);
+        int actual = bookingClient.deleteBooking(id, token).statusCode();
+        Assert.assertFalse(actual == HttpStatus.CREATED,
+                "Expected: " + HttpStatus.OK + " (OK) or " + HttpStatus.NO_CONTENT + " (No Content), Actual: " + actual);
     }
 
     @Test(groups = {"Smoke", "Regression"}, description = "DELETE /booking/{id}: deleted booking is no longer retrievable (GET returns 404)")
@@ -32,11 +41,11 @@ public class DeleteBookingsTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id       = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, token).then().statusCode(201);
+        bookingClient.deleteBooking(id, token).then().statusCode(HttpStatus.CREATED);
 
         bookingClient.getBookingById(id)
                 .then()
-                .statusCode(404);
+                .statusCode(HttpStatus.NOT_FOUND);
     }
 
     @Test(groups = {"Smoke", "Regression"}, description = "DELETE /booking/{id}: deleted booking does not appear in GET /booking list")
@@ -44,7 +53,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id       = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, token).then().statusCode(201);
+        bookingClient.deleteBooking(id, token).then().statusCode(HttpStatus.CREATED);
 
         var ids = bookingClient.getAllBookings()
                 .then()
@@ -74,7 +83,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteWithoutToken_doesNotRemoveBooking() {
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBookingWithoutAuth(id).then().statusCode(403);
+        bookingClient.deleteBookingWithoutAuth(id).then().statusCode(HttpStatus.FORBIDDEN);
 
         bookingClient.getBookingById(id)
                 .then()
@@ -89,7 +98,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteWithInvalidToken_returns403() {
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, "completely-fake-token-xyz")
+        bookingClient.deleteBooking(id, TOKENS.path("fake").asText())
                 .then()
                 .statusCode(403)
                 .body(equalTo("Forbidden"));
@@ -99,7 +108,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteWithEmptyToken_returns403() {
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, "")
+        bookingClient.deleteBooking(id, TOKENS.path("empty").asText())
                 .then()
                 .statusCode(403)
                 .body(equalTo("Forbidden"));
@@ -113,10 +122,9 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteNonExistentId_returns405() {
         String token = bookingClient.getValidToken();
 
-        bookingClient.deleteBooking(999999999, token)
-                .then()
-                .statusCode(405)
-                .body(equalTo("Method Not Allowed"));
+        int actual = bookingClient.deleteBooking(NON_EXISTENT_ID, token).statusCode();
+        Assert.assertFalse(actual == HttpStatus.METHOD_NOT_ALLOWED,
+                "Expected: " + HttpStatus.NOT_FOUND + " (Not Found), Actual: " + actual);
     }
 
     @Test(groups = {"Regression", "ExistingDefect"}, description = "DEFECT: Second DELETE on already-deleted booking returns 405 Method Not Allowed — should return 404 Not Found")
@@ -124,12 +132,11 @@ public class DeleteBookingsTest extends BookerBaseTest {
         String token = bookingClient.getValidToken();
         int id       = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, token).then().statusCode(201);
+        bookingClient.deleteBooking(id, token).then().statusCode(HttpStatus.CREATED);
 
-        bookingClient.deleteBooking(id, token)
-                .then()
-                .statusCode(405)
-                .body(equalTo("Method Not Allowed"));
+        int actual = bookingClient.deleteBooking(id, token).statusCode();
+        Assert.assertFalse(actual == HttpStatus.METHOD_NOT_ALLOWED,
+                "Expected: " + HttpStatus.NOT_FOUND + " (Not Found), Actual: " + actual);
     }
 
     // -----------------------------------------------------------------------
@@ -142,7 +149,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
 
         bookingClient.deleteBooking(0, token)
                 .then()
-                .statusCode(anyOf(is(400), is(404), is(405)))
+                .statusCode(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(not(emptyString()));
     }
 
@@ -152,7 +159,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
 
         bookingClient.deleteBooking(-1, token)
                 .then()
-                .statusCode(anyOf(is(400), is(404), is(405)))
+                .statusCode(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(not(emptyString()));
     }
 
@@ -164,7 +171,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteWithXssToken_returns403() {
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, "<script>alert('xss')</script>")
+        bookingClient.deleteBooking(id, TOKENS.path("xss").asText())
                 .then()
                 .statusCode(403)
                 .body(equalTo("Forbidden"));
@@ -174,7 +181,7 @@ public class DeleteBookingsTest extends BookerBaseTest {
     public void deleteWithSqlToken_returns403() {
         int id = bookingClient.createDefaultBooking();
 
-        bookingClient.deleteBooking(id, "' OR '1'='1")
+        bookingClient.deleteBooking(id, TOKENS.path("sql").asText())
                 .then()
                 .statusCode(403)
                 .body(equalTo("Forbidden"));

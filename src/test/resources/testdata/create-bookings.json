@@ -1,0 +1,436 @@
+{
+  "positive": {
+    "allFields": {
+      "firstname": "Alice",
+      "lastname": "Smith",
+      "totalprice": 250,
+      "depositpaid": true,
+      "bookingdates": { "checkin": "2025-06-01", "checkout": "2025-06-07" },
+      "additionalneeds": "Breakfast"
+    },
+    "retrievable": {
+      "firstname": "Bob",
+      "lastname": "Jones",
+      "totalprice": 180,
+      "depositpaid": false,
+      "bookingdates": { "checkin": "2025-07-10", "checkout": "2025-07-15" },
+      "additionalneeds": "Lunch"
+    },
+    "depositFalse": {
+      "firstname": "Carl",
+      "lastname": "Null",
+      "totalprice": 50,
+      "depositpaid": false,
+      "bookingdates": { "checkin": "2025-08-01", "checkout": "2025-08-03" },
+      "additionalneeds": "None"
+    },
+    "zeroPrice": {
+      "firstname": "Zero",
+      "lastname": "Price",
+      "totalprice": 0,
+      "depositpaid": true,
+      "bookingdates": { "checkin": "2025-09-01", "checkout": "2025-09-02" },
+      "additionalneeds": "None"
+    },
+    "longNotes": {
+      "firstname": "Long",
+      "lastname": "Needs",
+      "totalprice": 100,
+      "depositpaid": true,
+      "bookingdates": { "checkin": "2025-10-01", "checkout": "2025-10-05" },
+      "additionalneeds": "LONG_REPEAT:Extra :100"
+    }
+  },
+  "negative": [
+    {
+      "testName": "createWithEmptyBody_returnsError",
+      "body": {},
+      "expectedStatus": 500,
+      "description": "POST /booking with completely empty body returns 500"
+    },
+    {
+      "testName": "createWithoutDates_returnsError",
+      "body": {
+        "firstname": "NoDate",
+        "lastname": "User",
+        "totalprice": 100,
+        "depositpaid": true
+      },
+      "expectedStatus": 500,
+      "description": "POST /booking without bookingdates returns error"
+    },
+    {
+      "testName": "createWithNegativePrice_doesNotCrash",
+      "body": {
+        "firstname": "Negative",
+        "lastname": "Price",
+        "totalprice": -1,
+        "depositpaid": false,
+        "bookingdates": { "checkin": "2025-11-01", "checkout": "2025-11-05" },
+        "additionalneeds": "None"
+      },
+      "expectedStatus": 200,
+      "description": "POST /booking with negative totalprice does not crash"
+    },
+    {
+      "testName": "createWithMalformedDates_returnsError",
+      "body": {
+        "firstname": "Bad",
+        "lastname": "Date",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "not-a-date", "checkout": "also-bad" }
+      },
+      "expectedStatus": 200,
+      "description": "POST /booking with malformed date format"
+    },
+    {
+      "testName": "createWithCheckoutBeforeCheckin_returnsError",
+      "body": {
+        "firstname": "Reverse",
+        "lastname": "Dates",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-12-10", "checkout": "2025-12-01" },
+        "additionalneeds": "None"
+      },
+      "expectedStatus": 200,
+      "description": "POST /booking with checkout before checkin"
+    }
+  ],
+  "negativeMissingFields": [
+    {
+      "testName": "createWithoutFirstname_returnsError",
+      "body": {
+        "lastname": "User",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "expectedStatus": 500,
+      "description": "POST /booking without firstname field"
+    },
+    {
+      "testName": "createWithoutLastname_returnsError",
+      "body": {
+        "firstname": "User",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "expectedStatus": 500,
+      "description": "POST /booking without lastname field"
+    },
+    {
+      "testName": "createWithoutTotalPrice_returnsError",
+      "body": {
+        "firstname": "No",
+        "lastname": "Price",
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "expectedStatus": 500,
+      "description": "POST /booking without totalprice field"
+    },
+    {
+      "testName": "createWithoutDepositPaid_returnsError",
+      "body": {
+        "firstname": "No",
+        "lastname": "Deposit",
+        "totalprice": 100,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "expectedStatus": 500,
+      "description": "POST /booking without depositpaid field"
+    }
+  ],
+  "negativeExistingDefects": [
+    {
+      "testName": "createWithMissingCheckin_serverCrashes",
+      "body": {
+        "firstname": "No",
+        "lastname": "Checkin",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 500,
+      "expectedStatus": 400,
+      "description": "DEFECT: Missing checkin sub-field causes server crash"
+    },
+    {
+      "testName": "createWithMissingCheckout_serverCrashes",
+      "body": {
+        "firstname": "No",
+        "lastname": "Checkout",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01" }
+      },
+      "buggyStatus": 500,
+      "expectedStatus": 400,
+      "description": "DEFECT: Missing checkout sub-field causes server crash"
+    },
+    {
+      "testName": "createWithNonNumericPrice_acceptedWithoutValidation",
+      "body": {
+        "firstname": "Type",
+        "lastname": "Check",
+        "totalprice": "not-a-number",
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: Non-numeric totalprice accepted"
+    },
+    {
+      "testName": "createWithDecimalPrice_acceptedOnIntegerField",
+      "body": {
+        "firstname": "Float",
+        "lastname": "Price",
+        "totalprice": 99.99,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: Decimal totalprice silently accepted on integer field"
+    },
+    {
+      "testName": "createWithDepositAsBoolString_acceptedWithoutValidation",
+      "body": {
+        "firstname": "Bool",
+        "lastname": "AsString",
+        "totalprice": 100,
+        "depositpaid": "true",
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: depositpaid as string 'true' accepted"
+    },
+    {
+      "testName": "createWithDepositAsInteger_acceptedWithoutValidation",
+      "body": {
+        "firstname": "Deposit",
+        "lastname": "AsInt",
+        "totalprice": 100,
+        "depositpaid": 1,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: depositpaid as integer 1 accepted"
+    },
+    {
+      "testName": "createWithDatesAsString_serverCrashes",
+      "body": {
+        "firstname": "Dates",
+        "lastname": "AsString",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": "2025-01-01"
+      },
+      "buggyStatus": 500,
+      "expectedStatus": 400,
+      "description": "DEFECT: bookingdates as flat string causes server crash"
+    },
+    {
+      "testName": "createWithNullFirstname_serverCrashes",
+      "body": {
+        "firstname": null,
+        "lastname": "Null",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 500,
+      "expectedStatus": 400,
+      "description": "DEFECT: null firstname causes server crash"
+    },
+    {
+      "testName": "createWithEmptyFirstname_acceptedWithoutValidation",
+      "body": {
+        "firstname": "",
+        "lastname": "EmptyFirst",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" }
+      },
+      "buggyStatus": 200,
+      "expectedStatus": 400,
+      "description": "DEFECT: empty string firstname accepted"
+    }
+  ],
+  "boundary": {
+    "sameDates": {
+      "firstname": "Same",
+      "lastname": "Dates",
+      "totalprice": 100,
+      "depositpaid": true,
+      "bookingdates": { "checkin": "2025-12-01", "checkout": "2025-12-01" },
+      "additionalneeds": "None"
+    },
+    "maxIntPrice": {
+      "firstname": "Max",
+      "lastname": "Price",
+      "totalprice": 2147483647,
+      "depositpaid": true,
+      "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-02" },
+      "additionalneeds": "None"
+    }
+  },
+  "security": [
+    {
+      "testName": "createWithXssInFirstname_storedAsPlainText",
+      "body": {
+        "firstname": "<script>alert('xss')</script>",
+        "lastname": "Safe",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+        "additionalneeds": "None"
+      },
+      "expectedStatus": 200,
+      "description": "Script injection in firstname"
+    },
+    {
+      "testName": "createWithSqlInjectionInLastname_doesNotCrash",
+      "body": {
+        "firstname": "SQL",
+        "lastname": "'; DROP TABLE bookings; --",
+        "totalprice": 100,
+        "depositpaid": false,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+        "additionalneeds": "None"
+      },
+      "expectedStatus": 200,
+      "description": "SQL injection in lastname"
+    },
+    {
+      "testName": "createWithJsonInjectionInNotes_doesNotBreakResponse",
+      "body": {
+        "firstname": "Json",
+        "lastname": "Inject",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+        "additionalneeds": "\"},\"admin\":true,\"x\":\""
+      },
+      "expectedStatus": 200,
+      "description": "JSON injection in additionalneeds"
+    },
+    {
+      "testName": "createWithNullByteInFirstname_doesNotCrash",
+      "body": {
+        "firstname": "First\u0000Name",
+        "lastname": "Last",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01", "checkout": "2025-01-05" },
+        "additionalneeds": "None"
+      },
+      "expectedStatus": 200,
+      "description": "Null byte injection in firstname"
+    }
+  ],
+  "dateFormats": [
+    {
+      "testName": "createWithIso8601DateTimeFormat_isAccepted",
+      "body": {
+        "firstname": "Iso",
+        "lastname": "DateTime",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025-01-01T14:00:00Z", "checkout": "2025-01-05T12:00:00Z" }
+      },
+      "expectedStatus": 200,
+      "description": "ISO-8601 datetime format"
+    },
+    {
+      "testName": "createWithSlashSeparatedDates_isAccepted",
+      "body": {
+        "firstname": "Slash",
+        "lastname": "Date",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2025/01/01", "checkout": "2025/01/05" }
+      },
+      "expectedStatus": 200,
+      "description": "Slash-separated date format"
+    },
+    {
+      "testName": "createWithDdMmYyyyDates_isAccepted",
+      "body": {
+        "firstname": "Ddmm",
+        "lastname": "Date",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "01-01-2025", "checkout": "05-01-2025" }
+      },
+      "expectedStatus": 200,
+      "description": "DD-MM-YYYY date format"
+    },
+    {
+      "testName": "createWithMmDdYyyyDates_isAccepted",
+      "body": {
+        "firstname": "MmDd",
+        "lastname": "Format",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "01/01/2025", "checkout": "01/05/2025" }
+      },
+      "expectedStatus": 200,
+      "description": "MM/DD/YYYY date format"
+    },
+    {
+      "testName": "createWithLongFormMonthDates_isAccepted",
+      "body": {
+        "firstname": "Month",
+        "lastname": "Name",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "January 01, 2025", "checkout": "January 05, 2025" }
+      },
+      "expectedStatus": 200,
+      "description": "Written-out month date format"
+    },
+    {
+      "testName": "createWithUnixTimestampDates_isAccepted",
+      "body": {
+        "firstname": "Unix",
+        "lastname": "Timestamp",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "1735689600", "checkout": "1736035200" }
+      },
+      "expectedStatus": 200,
+      "description": "Unix timestamp as date"
+    },
+    {
+      "testName": "createWithFarFutureDates_isAccepted",
+      "body": {
+        "firstname": "Far",
+        "lastname": "Future",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "2099-12-30", "checkout": "2099-12-31" }
+      },
+      "expectedStatus": 200,
+      "description": "Far-future dates (year 2099)"
+    },
+    {
+      "testName": "createWithHistoricalDates_isAccepted",
+      "body": {
+        "firstname": "Historical",
+        "lastname": "Date",
+        "totalprice": 100,
+        "depositpaid": true,
+        "bookingdates": { "checkin": "1900-01-01", "checkout": "1900-01-02" }
+      },
+      "expectedStatus": 200,
+      "description": "Historical past dates (year 1900)"
+    }
+  ]
+}

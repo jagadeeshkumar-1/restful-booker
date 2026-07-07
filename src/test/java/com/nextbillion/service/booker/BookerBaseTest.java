@@ -17,12 +17,16 @@ import org.testng.annotations.BeforeSuite;
 public class BookerBaseTest extends BaseTest {
 
     protected static BookingApiClient bookingClient;
+    protected static String           adminUsername;
+    protected static String           adminPassword;
 
     @Override
     @BeforeSuite(alwaysRun = true)
     public void initSuite() {
         super.initSuite();
-        bookingClient = new BookingApiClient(requestSpec);
+        adminUsername = resolveUri("booker.admin.username", "BOOKER_ADMIN_USERNAME", "admin");
+        adminPassword = resolveUri("booker.admin.password", "BOOKER_ADMIN_PASSWORD", "password123");
+        bookingClient = new BookingApiClient(requestSpec, adminUsername, adminPassword);
 
         int pingStatus = bookingClient.ping().statusCode();
         if (pingStatus != 201) {

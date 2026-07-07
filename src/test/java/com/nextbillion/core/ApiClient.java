@@ -1,7 +1,5 @@
 package com.nextbillion.core;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 
@@ -23,19 +21,9 @@ import static io.restassured.RestAssured.given;
 public abstract class ApiClient {
 
     protected final RequestSpecification requestSpec;
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     protected ApiClient(RequestSpecification requestSpec) {
         this.requestSpec = requestSpec;
-    }
-
-    private String toJson(Object body) {
-        if (body instanceof String) return (String) body;
-        try {
-            return MAPPER.writeValueAsString(body);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize request body", e);
-        }
     }
 
     // ------------------------------------------------------------------
@@ -50,20 +38,16 @@ public abstract class ApiClient {
         return given().spec(requestSpec).queryParams(queryParams).when().get(path);
     }
 
-    public <T> T get(String path, Class<T> responseType) {
-        return get(path).then().statusCode(200).extract().as(responseType);
-    }
-
     // ------------------------------------------------------------------
     // POST
     // ------------------------------------------------------------------
 
     public Response post(String path, Object body) {
-        return given().spec(requestSpec).body(toJson(body)).when().post(path);
+        return given().spec(requestSpec).body(body).when().post(path);
     }
 
     public <T> T post(String path, Object body, int expectedStatus, Class<T> responseType) {
-        return given().spec(requestSpec).body(toJson(body)).when().post(path)
+        return given().spec(requestSpec).body(body).when().post(path)
                 .then().statusCode(expectedStatus).extract().as(responseType);
     }
 
@@ -72,11 +56,7 @@ public abstract class ApiClient {
     // ------------------------------------------------------------------
 
     public Response put(String path, Object body, String token) {
-        return given().spec(requestSpec).cookie("token", token).body(toJson(body)).when().put(path);
-    }
-
-    public <T> T put(String path, Object body, String token, int expectedStatus, Class<T> responseType) {
-        return put(path, body, token).then().statusCode(expectedStatus).extract().as(responseType);
+        return given().spec(requestSpec).cookie("token", token).body(body).when().put(path);
     }
 
     // ------------------------------------------------------------------
@@ -84,11 +64,7 @@ public abstract class ApiClient {
     // ------------------------------------------------------------------
 
     public Response patch(String path, Object body, String token) {
-        return given().spec(requestSpec).cookie("token", token).body(toJson(body)).when().patch(path);
-    }
-
-    public <T> T patch(String path, Object body, String token, int expectedStatus, Class<T> responseType) {
-        return patch(path, body, token).then().statusCode(expectedStatus).extract().as(responseType);
+        return given().spec(requestSpec).cookie("token", token).body(body).when().patch(path);
     }
 
     // ------------------------------------------------------------------
@@ -104,30 +80,22 @@ public abstract class ApiClient {
     }
 
     // ------------------------------------------------------------------
-    // Auth (POST without Content-Type override)
-    // ------------------------------------------------------------------
-
-    public Response authenticate(String path, Object body) {
-        return given().spec(requestSpec).body(toJson(body)).when().post(path);
-    }
-
-    // ------------------------------------------------------------------
     // Unauthenticated mutations — for negative/security tests
     // ------------------------------------------------------------------
 
     public Response putWithoutAuth(String path, Object body) {
-        return given().spec(requestSpec).body(toJson(body)).when().put(path);
+        return given().spec(requestSpec).body(body).when().put(path);
     }
 
     public Response patchWithoutAuth(String path, Object body) {
-        return given().spec(requestSpec).body(toJson(body)).when().patch(path);
+        return given().spec(requestSpec).body(body).when().patch(path);
     }
 
     public Response putWithBadToken(String path, Object body, String badToken) {
-        return given().spec(requestSpec).cookie("token", badToken).body(toJson(body)).when().put(path);
+        return given().spec(requestSpec).cookie("token", badToken).body(body).when().put(path);
     }
 
     public Response patchWithBadToken(String path, Object body, String badToken) {
-        return given().spec(requestSpec).cookie("token", badToken).body(toJson(body)).when().patch(path);
+        return given().spec(requestSpec).cookie("token", badToken).body(body).when().patch(path);
     }
 }
